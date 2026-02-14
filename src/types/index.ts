@@ -32,6 +32,7 @@ export interface APIEvaluation {
 
 export interface Record {
   id: string;
+  internalId?: string; // Internal UUID for API calls
   imageUrl: string;
   image_id?: string;
   status?: string;
@@ -48,4 +49,37 @@ export interface Record {
   };
   models: any[];
   navigation?: Navigation;
+}
+
+// New types for 6-image evaluation workflow
+export interface ModelOutput {
+  id: string;
+  modelName: string; // A, B, C, D, E, F
+  imageUrl: string;
+  response: string;
+  evaluations?: APIEvaluation[];
+  status?: 'completed' | 'in_progress' | 'pending';
+}
+
+export interface ImageRecord {
+  imageIndex: number;
+  imageUrl: string;
+  imageId: string;
+  internalId?: string; // Internal UUID for API calls
+  studyId?: string;
+  groundTruth: {
+    findings: string;
+    impressions: string;
+  };
+  modelOutputs: ModelOutput[];
+  evaluationStatus?: 'completed' | 'in_progress' | 'pending';
+  completedModels: number;
+  totalModels: number;
+}
+
+export interface CaseRecord {
+  id: string;
+  studyId: string;
+  images: ImageRecord[];
+  totalProgress: number; // 0-100
 }

@@ -5,37 +5,59 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle } from 'lucide-react'
-import { isSupervisor } from '@/services'
 
 function RadId() {
-  const [userId, setUserId] = useState('')
+  const [email, setEmail] = useState('') // Changed userId to email
+  const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  // Check for token in URL (from test script) and auto-login
+  useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+        localStorage.setItem('authToken', token);
+        // We need to fetch user details to route correctly
+        // Simple hack: route to doctor page, let it resolve user
+        // But we store token first
+    }
+
+  });
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!userId.trim()) return
+    if (!email.trim() || !password.trim()) return
     
     setIsSubmitting(true)
     setError('')
     
     try {
-      // Check if the user is a supervisor
-      const userIsSupervisor = await isSupervisor(userId)
+      // Import login function dynamically or use window object if service exposes it, 
+      // but better to import it at top. Assuming it is imported.
+      // Need to update imports at top of file
       
-      if (userIsSupervisor) {
-        // Navigate to supervisor dashboard
-        console.log('Navigating to supervisor dashboard:', userId)
-        navigate(`/supervisor/dashboard/${userId}`)
+      const { login, getUserDetails } = await import('@/services');
+      
+      const response = await login(email, password);
+      
+      if (response && response.access_token) {
+          localStorage.setItem('authToken', response.access_token);
+          localStorage.setItem('userId', response.user.id);
+          localStorage.setItem('userRole', response.user.role || 'evaluator');
+          
+          if (response.user.role === 'supervisor') {
+               navigate(`/supervisor/dashboard/${response.user.id}`);
+          } else {
+               navigate(`/doctor/${response.user.id}`);
+          }
       } else {
-        // Navigate to doctor cases
-        console.log('Navigating to doctor cases:', userId)
-        navigate(`/doctor/${userId}`)
+          setError('Login failed. No token received.');
       }
+
     } catch (err) {
-      console.error('Error checking user role:', err)
-      setError('Could not verify user ID. Please check the ID and try again.')
+      console.error('Error logging in:', err)
+      setError('Could not login. Please check your email and try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -45,8 +67,8 @@ function RadId() {
     <div className="flex items-center justify-center h-full">
       <Card className="w-96">
         <CardHeader>
-          <CardTitle className="text-center">X-Ray AI Insights Hub</CardTitle>
-          <CardDescription className="text-center">Enter your ID to access the system</CardDescription>
+          <CardTitle className="text-center">Syn-CXR RISE Evaluation</CardTitle>
+          <CardDescription className="text-center">Enter your email to access the system</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -58,25 +80,33 @@ function RadId() {
             )}
             
             <div className="space-y-2">
-              <label className="text-sm font-medium">Enter Your ID</label>
+              <label className="text-sm font-medium">Email Address</label>
               <Input
-                type="text"
-                placeholder="Enter your ID"
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
+                type="email"
+                placeholder="doctor@hospital.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full"
               />
-              <p className="text-xs text-muted-foreground">
-                For testing, use: d7a13dc2-e96d-4e03-b400-9dc8537247ca (doctor) or 09624215-09ba-4a56-ad5e-251c74d0a74c (supervisor)
-              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Password</label>
+              <Input
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full"
+              />
             </div>
 
             <Button 
               type="submit"
-              disabled={!userId.trim() || isSubmitting}
+              disabled={!email.trim() || !password.trim() || isSubmitting}
               className="w-full"
             >
-              {isSubmitting ? 'Checking...' : 'Login'}
+              {isSubmitting ? 'Logging in...' : 'Login'}
             </Button>
           </form>
         </CardContent>

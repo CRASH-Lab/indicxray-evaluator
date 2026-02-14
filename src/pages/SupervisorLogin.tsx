@@ -5,16 +5,40 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 function SupervisorLogin() {
-  const [supervisorId, setSupervisorId] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  function handleLogin(e) {
+  async function handleLogin(e) {
     e.preventDefault()
-    if (!supervisorId.trim()) return
+    if (!email.trim() || !password.trim()) return
     
-    console.log('Logging in as supervisor:', supervisorId)
-    navigate(`/supervisor/dashboard/${supervisorId}`)
+    setIsSubmitting(true)
+    setError('')
+
+    try {
+      const { login } = await import('@/services');
+      const response = await login(email, password);
+      
+      if (response && response.access_token) {
+        localStorage.setItem('authToken', response.access_token);
+        localStorage.setItem('userId', response.user.id);
+        localStorage.setItem('userRole', response.user.role);
+        
+        if (response.user.role === 'supervisor') {
+          navigate(`/supervisor/dashboard/${response.user.id}`)
+        } else {
+          setError('Access denied: Supervisors only')
+        }
+      }
+    } catch (err) {
+      console.error(err)
+      setError('Invalid credentials')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -26,25 +50,37 @@ function SupervisorLogin() {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Enter Supervisor ID</label>
+              <label className="text-sm font-medium">Email</label>
               <Input
-                type="text"
-                placeholder="Enter your supervisor ID"
-                value={supervisorId}
-                onChange={(e) => setSupervisorId(e.target.value)}
+                type="email"
+                placeholder="supervisor@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full"
               />
-              <p className="text-xs text-muted-foreground">
-                Enter your supervisor ID to access the dashboard
-              </p>
             </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Password</label>
+              <Input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full"
+              />
+            </div>
+
+            {error && (
+              <p className="text-xs text-red-500">{error}</p>
+            )}
 
             <Button 
               type="submit"
-              disabled={!supervisorId.trim() || isSubmitting}
+              disabled={!email.trim() || !password.trim() || isSubmitting}
               className="w-full"
             >
-              {isSubmitting ? 'Loading...' : 'Login'}
+              {isSubmitting ? 'Logging in...' : 'Login'}
             </Button>
             
             <div className="text-center">

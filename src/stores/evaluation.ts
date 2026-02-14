@@ -83,7 +83,7 @@ const useEvalutationStore = create<EvaluationStore>()((set) => ({
     })),
   initAtId: (idx, payload) =>
     set((state) => {
-      console.log(`Initializing evaluations for ${idx} with:`, payload);
+
       return {
         ...state,
         evaluation: {

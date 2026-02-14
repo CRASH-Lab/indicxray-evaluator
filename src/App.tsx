@@ -10,6 +10,8 @@ import IndexWrapper from './pages/IndexWrapper'
 import DoctorCases from './pages/DoctorCases'
 import SupervisorLogin from './pages/SupervisorLogin'
 import SupervisorDashboard from './pages/SupervisorDashboard'
+import AdminUsers from './pages/AdminUsers'
+import { GlobalErrorHandler } from './components/GlobalErrorHandler'
 
 const queryClient = new QueryClient()
 
@@ -18,6 +20,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <GlobalErrorHandler />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<RadId />} />
@@ -27,6 +30,7 @@ const App = () => (
           {/* Supervisor routes */}
           <Route path="/supervisor" element={<SupervisorLogin />} />
           <Route path="/supervisor/dashboard/:supervisorId" element={<SupervisorDashboard />} />
+          <Route path="/supervisor/users" element={<AdminUsers />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

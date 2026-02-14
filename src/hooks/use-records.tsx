@@ -1,4 +1,4 @@
-import { getRecords } from '@/services'
+import { getAssignmentDetails } from '@/services'
 import { Record } from '@/types'
 import { useEffect, useRef, useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
@@ -14,8 +14,8 @@ function useRecords(radId: string) {
       return
     }
 
-    console.log('Fetching records for radId:', radId)
     runOnceRef.current = true
+
     
     ;(async () => {
       try {
@@ -33,25 +33,34 @@ function useRecords(radId: string) {
           return
         }
 
-        // First try to fetch the specific case
+        // Fetch unified list if 'all' is passed
+        const { getAllAssignedImages, getAssignmentDetails } = await import('@/services');
+
         try {
-          const _records = await getRecords(radId)
-          console.log('Records fetched successfully:', _records)
-          
-          if (!_records.data || _records.data.length === 0) {
-            throw new Error('No records returned from API')
+          let _records;
+          if (radId === 'all') {
+             _records = await getAllAssignedImages();
+          } else {
+
+              _records = await getAssignmentDetails(radId);
           }
 
-          // Check if we have all required data
-          const record = _records.data[0]
-          if (!record.imageUrl) {
-            throw new Error('Missing image URL in record')
+
+          
+          if (!_records.data || _records.data.length === 0) {
+             // If 'all' returns empty, maybe no assignments?
+             if (radId === 'all') {
+                console.warn('No assigned images found.');
+             } else {
+                throw new Error('No records returned from API');
+             }
           }
-          if (!record.modelOutputs || record.modelOutputs.length === 0) {
-            throw new Error('No model outputs found')
-          }
-          if (!record.metrics || record.metrics.length === 0) {
-            throw new Error('No metrics found')
+
+          // Check if we have all required data (if records exist)
+          if (_records.data && _records.data.length > 0) {
+              const record = _records.data[0]
+              // Basic validation
+              if (!record.imageUrl) console.warn('Record missing image URL');
           }
 
           setRecords(_records.data)

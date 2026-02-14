@@ -33,7 +33,9 @@ import {
   getAllEvaluations, 
   getAllCases, 
   getMetrics,
-  getEvaluatorCases
+  getEvaluatorCases,
+  adminGetAssignments,
+  adminGetEvaluations
 } from '@/services'
 import { Loader2 } from 'lucide-react'
 
@@ -90,104 +92,37 @@ function SupervisorDashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch cases first to have case data available
-        setLoading(prev => ({ ...prev, cases: true }))
-        const casesData = await getAllCases()
-        console.log("Fetched cases:", casesData)
-        setCases(casesData)
-        setLoading(prev => ({ ...prev, cases: false }))
-        
-        // Fetch case assignments to get the relationship between cases and evaluators
-        const caseAssignmentsResponse = await fetch('/api/case-assignments/');
-        const caseAssignments = await caseAssignmentsResponse.json();
-        console.log("Fetched case assignments:", caseAssignments);
-        
-        // Create a map of assignment IDs to case IDs for quick lookup
-        const assignmentToCaseMap = {};
-        caseAssignments.forEach(assignment => {
-          assignmentToCaseMap[assignment.id] = assignment.case;
-        });
-        console.log("Assignment to case map:", assignmentToCaseMap);
-        
-        // Fetch evaluators
+        // Fetch users (Evaluators)
         setLoading(prev => ({ ...prev, evaluators: true }))
         const evaluatorsData = await getAllEvaluators()
-        console.log("Fetched evaluators:", evaluatorsData)
         setEvaluators(evaluatorsData)
         setLoading(prev => ({ ...prev, evaluators: false }))
         
-        // Fetch all evaluations
-        setLoading(prev => ({ ...prev, evaluations: true }))
-        const evaluationsData = await getAllEvaluations()
-        console.log("Fetched evaluations:", evaluationsData)
+        // Fetch all assignments (Cases)
+        setLoading(prev => ({ ...prev, cases: true }))
+        const assignmentsData = await adminGetAssignments()
         
-        // Get model data for populating model names
-        const modelsResponse = await fetch('/api/models/');
-        const models = await modelsResponse.json();
-        console.log("Fetched models:", models);
-        
-        // Create a map of model IDs to model names for quick lookup
-        const modelMap = {};
-        models.forEach(model => {
-          modelMap[model.id] = model.name;
-        });
-        
-        // Get model responses data to link model_response IDs to model IDs
-        // Since there's no direct API, we'll try to get this from case details
-        const modelResponseMap = {};
-        for (const caseItem of casesData) {
-          try {
-            const caseDetailsResponse = await fetch(`/api/cases/${caseItem.id}/details/`);
-            const caseDetails = await caseDetailsResponse.json();
-            
-            if (caseDetails && caseDetails.model_responses) {
-              caseDetails.model_responses.forEach(response => {
-                modelResponseMap[response.id] = {
-                  model: response.model,
-                  modelName: modelMap[response.model] || 'Unknown Model'
-                };
-              });
-            }
-          } catch (err) {
-            console.error(`Error fetching details for case ${caseItem.id}:`, err);
-          }
-        }
-        
-        console.log("Model response map:", modelResponseMap);
+        // Map assignments to "Cases" format
+        const mappedCases = assignmentsData.map((a: any) => ({
+            id: a.id, // Assignment ID
+            image_id: a.evaluation_set.study_id,
+        }));
+        setCases(mappedCases)
+        setLoading(prev => ({ ...prev, cases: false }))
         
         // Fetch metrics
         setLoading(prev => ({ ...prev, metrics: true }))
         const metricsData = await getMetrics()
-        console.log("Fetched metrics:", metricsData)
+
         setMetrics(metricsData)
         setLoading(prev => ({ ...prev, metrics: false }))
         
-        // Map evaluation fields correctly based on actual backend structure
-        const mappedEvaluations = evaluationsData.map(evaluation => {
-          // Get the case ID from the case assignment
-          const caseId = assignmentToCaseMap[evaluation.case_assignment] || "unknown-case";
-          
-          // Get evaluator ID from case assignment
-          const evaluatorId = caseAssignments.find(ca => ca.id === evaluation.case_assignment)?.evaluator || "unknown-evaluator";
-          
-          // Get model data from model response
-          const modelInfo = modelResponseMap[evaluation.model_response] || { model: "unknown-model", modelName: "Unknown Model" };
-          
-          return {
-            id: evaluation.id || `temp-${Math.random()}`,
-            case_id: caseId,
-            evaluator_id: evaluatorId,
-            model_id: modelInfo.model,
-            model_name: modelInfo.modelName,
-            metric_id: evaluation.metric || "unknown-metric",
-            score: evaluation.score || 0,
-            created_at: evaluation.created_at || new Date().toISOString()
-          };
-        });
-        
-        console.log("Mapped evaluations:", mappedEvaluations)
-        setEvaluations(mappedEvaluations)
+        // Fetch all evaluations
+        setLoading(prev => ({ ...prev, evaluations: true }))
+        const evaluationsData = await adminGetEvaluations()
+        setEvaluations(evaluationsData)
         setLoading(prev => ({ ...prev, evaluations: false }))
+
       } catch (err) {
         console.error('Error fetching supervisor data:', err)
         setError('Failed to load data. Please check your connection and try again.')
@@ -247,7 +182,6 @@ function SupervisorDashboard() {
     }
     
     try {
-      console.log(`Fetching details for case ${caseId}`);
       const caseResponse = await fetch(`/api/cases/${caseId}/`);
       
       if (!caseResponse.ok) {
@@ -256,7 +190,7 @@ function SupervisorDashboard() {
       }
       
       const caseData = await caseResponse.json();
-      console.log(`Got case data:`, caseData);
+
       
       // Add this case to our list
       setCases(prevCases => [...prevCases, caseData]);
@@ -339,7 +273,12 @@ function SupervisorDashboard() {
               <CardTitle>Supervisor Dashboard</CardTitle>
               <CardDescription>Review evaluator performance and case evaluations</CardDescription>
             </div>
-            <Button variant="outline" onClick={goBack}>Back to Login</Button>
+            <div className="flex gap-2">
+              <Button variant="default" onClick={() => navigate('/supervisor/users')}>
+                Manage Users
+              </Button>
+              <Button variant="outline" onClick={goBack}>Back to Login</Button>
+            </div>
           </div>
         </CardHeader>
       </Card>

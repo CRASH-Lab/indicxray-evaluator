@@ -12,9 +12,10 @@ interface CaseWithDetails {
   image_id: string
   image_url: string
   status: string
+  study_id?: string
   completed_evaluations: number
   total_evaluations: number
-  last_updated: string
+  last_updated?: string
 }
 
 interface CasesResponse {
@@ -43,18 +44,18 @@ function DoctorCases() {
       setError('')
       
       try {
-        // Fetch doctor details and cases concurrently
-        const [details, casesResponse] = await Promise.all([
+        // Fetch doctor details and ALL IMAGES
+        const { getAllAssignedImages } = await import('@/services');
+        
+        const [details, imagesResponse] = await Promise.all([
           getUserDetails(doctorId),
-          getEvaluatorCasesWithDetails(doctorId)
+          getAllAssignedImages() // Use the new endpoint
         ]);
 
         if (!isMounted) return;
 
-        console.log('Doctor details:', details);
-        console.log('Cases data:', casesResponse);
-        
         // Set doctor info
+
         if (details && details.name) {
           setDoctorInfo({
             name: details.name,
@@ -68,7 +69,27 @@ function DoctorCases() {
         }
 
         // Set cases data
-        setCasesData(casesResponse);
+        // Map images to the "DetailedCase" structure we used loosely
+        if (imagesResponse && imagesResponse.data) {
+             const mappedImages: CaseWithDetails[] = imagesResponse.data.map((img: any) => ({
+                 id: img.internalId,
+                 image_id: img.image_id,
+                 image_url: img.ground_truth_image_url || '',
+                 status: img.status,
+                 study_id: img.studyId,
+                 completed_evaluations: 0, 
+                 total_evaluations: 0,
+                 last_updated: new Date().toISOString()
+             }));
+             
+             setCasesData({
+                 cases: mappedImages,
+                 total_cases: mappedImages.length,
+                 pending_cases: 0,
+                 in_progress_cases: 0,
+                 completed_cases: 0
+             });
+        }
       } catch (err) {
         console.error('Error fetching data:', err);
         if (!isMounted) return;
@@ -169,7 +190,7 @@ function DoctorCases() {
                 <div
                   key={caseItem.id}
                   className="p-4 border rounded-lg cursor-pointer hover:bg-medical-darker-gray transition-colors group"
-                  onClick={() => navigateToCase(caseItem.id)}
+                  onClick={() => navigate(`/rad/all?doctorId=${doctorId}&startIndex=${index}`)}
                 >
                   <div className="flex justify-between items-center">
                     <div>

@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
     proxy: {
       // Proxy all /api requests to the Django backend
       '/api': {
-        target: 'https://medical-backend-1056714537361.us-central1.run.app',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, 'api')
@@ -29,6 +29,6 @@ export default defineConfig(({ mode }) => ({
     },
   },
   define: {
-    'import.meta.env.VITE_API_URL': JSON.stringify(mode === 'development' ? '/api' : 'https://medical-backend-1056714537361.us-central1.run.app/api')
+    'import.meta.env.VITE_API_URL': JSON.stringify(mode === 'development' ? 'http://127.0.0.1:8000' : 'https://medical-backend-1056714537361.us-central1.run.app')
   }
 }));
