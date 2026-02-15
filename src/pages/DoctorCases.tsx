@@ -113,7 +113,7 @@ function DoctorCases() {
   }
 
   function goBack() {
-    navigate('/');
+    navigate(`/select-stage/${doctorId}`);
   }
 
   // Loading skeleton
@@ -157,7 +157,7 @@ function DoctorCases() {
               <CardTitle>{doctorInfo.name}</CardTitle>
               <CardDescription>{doctorInfo.specialty}</CardDescription>
             </div>
-            <Button variant="outline" onClick={goBack}>Back to Login</Button>
+            <Button variant="outline" onClick={goBack}>Back</Button>
           </div>
         </CardHeader>
       </Card>

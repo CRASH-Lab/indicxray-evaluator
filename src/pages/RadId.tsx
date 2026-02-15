@@ -49,7 +49,8 @@ function RadId() {
           if (response.user.role === 'supervisor') {
                navigate(`/supervisor/dashboard/${response.user.id}`);
           } else {
-               navigate(`/doctor/${response.user.id}`);
+               // Navigate to stage selection screen instead of direct dashboard
+               navigate(`/select-stage/${response.user.id}`);
           }
       } else {
           setError('Login failed. No token received.');

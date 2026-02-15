@@ -35,7 +35,8 @@ import {
   getMetrics,
   getEvaluatorCases,
   adminGetAssignments,
-  adminGetEvaluations
+  adminGetEvaluations,
+  adminGetStage2Stats
 } from '@/services'
 import { Loader2 } from 'lucide-react'
 
@@ -79,13 +80,15 @@ function SupervisorDashboard() {
   const [cases, setCases] = useState<Case[]>([])
   const [evaluatorCases, setEvaluatorCases] = useState<any[]>([])
   const [metrics, setMetrics] = useState<Metric[]>([])
+  const [stage2Stats, setStage2Stats] = useState<any>(null)
   const [selectedEvaluator, setSelectedEvaluator] = useState<string | null>(null)
   const [loading, setLoading] = useState({
     evaluators: true,
     evaluations: true,
     cases: true,
     metrics: true,
-    evaluatorCases: false
+    evaluatorCases: false,
+    stage2: true
   })
   const [error, setError] = useState('')
 
@@ -97,6 +100,12 @@ function SupervisorDashboard() {
         const evaluatorsData = await getAllEvaluators()
         setEvaluators(evaluatorsData)
         setLoading(prev => ({ ...prev, evaluators: false }))
+        
+        // Fetch Stage 2 Stats
+        setLoading(prev => ({ ...prev, stage2: true }))
+        const s2Stats = await adminGetStage2Stats()
+        setStage2Stats(s2Stats)
+        setLoading(prev => ({ ...prev, stage2: false }))
         
         // Fetch all assignments (Cases)
         setLoading(prev => ({ ...prev, cases: true }))
@@ -131,7 +140,8 @@ function SupervisorDashboard() {
           evaluations: false,
           cases: false,
           metrics: false,
-          evaluatorCases: false
+          evaluatorCases: false,
+          stage2: false
         })
       }
     }
@@ -284,9 +294,10 @@ function SupervisorDashboard() {
       </Card>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="evaluators">Evaluators</TabsTrigger>
-          <TabsTrigger value="evaluations">Evaluations</TabsTrigger>
+          <TabsTrigger value="evaluations">Stage 1 Evaluations</TabsTrigger>
+          <TabsTrigger value="stage2">Stage 2 Status</TabsTrigger>
           <TabsTrigger value="metrics">Metrics</TabsTrigger>
         </TabsList>
         
@@ -479,6 +490,66 @@ function SupervisorDashboard() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+
+
+        <TabsContent value="stage2">
+             <Card>
+                 <CardHeader>
+                     <CardTitle>Stage 2: AI Detection Progress</CardTitle>
+                     <CardDescription>
+                        Tracking evaluator progress on {stage2Stats?.total_images || 0} Stage 2 images.
+                     </CardDescription>
+                 </CardHeader>
+                 <CardContent>
+                     {loading.stage2 ? (
+                         <div className="flex justify-center py-8">
+                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                         </div>
+                     ) : (
+                         <Table>
+                             <TableHeader>
+                                 <TableRow>
+                                     <TableHead>Evaluator</TableHead>
+                                     <TableHead>Email</TableHead>
+                                     <TableHead>Completed</TableHead>
+                                     <TableHead>Current Progress</TableHead>
+                                 </TableRow>
+                             </TableHeader>
+                             <TableBody>
+                                 {stage2Stats?.stats?.length === 0 ? (
+                                     <TableRow>
+                                         <TableCell colSpan={4} className="text-center">No evaluator data found</TableCell>
+                                     </TableRow>
+                                 ) : (
+                                     stage2Stats?.stats?.map((stat: any) => (
+                                         <TableRow key={stat.evaluator_id}>
+                                             <TableCell className="font-medium">{stat.evaluator_name}</TableCell>
+                                             <TableCell>{stat.email}</TableCell>
+                                             <TableCell>
+                                                 <div className="flex items-center gap-2">
+                                                     <span className={stat.completed_count === stat.total_count ?("text-green-600 font-bold") : ""}>
+                                                         {stat.completed_count} / {stat.total_count}
+                                                     </span>
+                                                 </div>
+                                             </TableCell>
+                                             <TableCell>
+                                                 <div className="w-[100px] h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                     <div 
+                                                         className={`h-full ${stat.completed_count === stat.total_count ? 'bg-green-500' : 'bg-blue-500'}`} 
+                                                         style={{ width: `${stat.progress_percentage}%` }}
+                                                     />
+                                                 </div>
+                                             </TableCell>
+                                         </TableRow>
+                                     ))
+                                 )}
+                             </TableBody>
+                         </Table>
+                     )}
+                 </CardContent>
+             </Card>
         </TabsContent>
 
         <TabsContent value="metrics">
