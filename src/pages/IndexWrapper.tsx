@@ -1,3 +1,4 @@
+// Simplified hook usage
 import useRecords from '@/hooks/use-records'
 import { useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
@@ -8,7 +9,15 @@ import { AlertCircle } from 'lucide-react'
 
 function IndexWrapper() {
   const { radId } = useParams()
-  const records = useRecords(radId)
+  // Use 'all' to trigger unified list, or just use useRecords with the new logic if implemented in the hook
+  // We'll update useRecords to handle the 'all' keyword or we can change logic there.
+  // For now let's pass 'all' if we want unified list.
+  
+  // Actually, we'll modify useRecords next to handle 'all'
+  const records = useRecords(radId || 'all') // Default to 'all' if undefined? 
+  // No, radId is required by route /rad/:radId
+  // The dashboard should link to /rad/all
+  
   const [doctorInfo, setDoctorInfo] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -24,15 +33,14 @@ function IndexWrapper() {
         
         // If no doctorId in URL, try to get from local storage or just show generic message
         if (!doctorId) {
-          console.log('No doctorId found in URL')
           setDoctorInfo({ name: 'Anonymous Evaluator' })
+
           return
         }
         
         // Fetch doctor details
-        console.log('Fetching doctor details for:', doctorId);
         const details = await getUserDetails(doctorId)
-        console.log('Doctor details:', details)
+
         
         if (details && details.name) {
           setDoctorInfo(details)

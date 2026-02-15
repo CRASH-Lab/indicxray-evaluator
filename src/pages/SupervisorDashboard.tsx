@@ -33,7 +33,10 @@ import {
   getAllEvaluations, 
   getAllCases, 
   getMetrics,
-  getEvaluatorCases
+  getEvaluatorCases,
+  adminGetAssignments,
+  adminGetEvaluations,
+  adminGetStage2Stats
 } from '@/services'
 import { Loader2 } from 'lucide-react'
 
@@ -77,117 +80,58 @@ function SupervisorDashboard() {
   const [cases, setCases] = useState<Case[]>([])
   const [evaluatorCases, setEvaluatorCases] = useState<any[]>([])
   const [metrics, setMetrics] = useState<Metric[]>([])
+  const [stage2Stats, setStage2Stats] = useState<any>(null)
   const [selectedEvaluator, setSelectedEvaluator] = useState<string | null>(null)
   const [loading, setLoading] = useState({
     evaluators: true,
     evaluations: true,
     cases: true,
     metrics: true,
-    evaluatorCases: false
+    evaluatorCases: false,
+    stage2: true
   })
   const [error, setError] = useState('')
 
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch cases first to have case data available
-        setLoading(prev => ({ ...prev, cases: true }))
-        const casesData = await getAllCases()
-        console.log("Fetched cases:", casesData)
-        setCases(casesData)
-        setLoading(prev => ({ ...prev, cases: false }))
-        
-        // Fetch case assignments to get the relationship between cases and evaluators
-        const caseAssignmentsResponse = await fetch('/api/case-assignments/');
-        const caseAssignments = await caseAssignmentsResponse.json();
-        console.log("Fetched case assignments:", caseAssignments);
-        
-        // Create a map of assignment IDs to case IDs for quick lookup
-        const assignmentToCaseMap = {};
-        caseAssignments.forEach(assignment => {
-          assignmentToCaseMap[assignment.id] = assignment.case;
-        });
-        console.log("Assignment to case map:", assignmentToCaseMap);
-        
-        // Fetch evaluators
+        // Fetch users (Evaluators)
         setLoading(prev => ({ ...prev, evaluators: true }))
         const evaluatorsData = await getAllEvaluators()
-        console.log("Fetched evaluators:", evaluatorsData)
         setEvaluators(evaluatorsData)
         setLoading(prev => ({ ...prev, evaluators: false }))
         
-        // Fetch all evaluations
-        setLoading(prev => ({ ...prev, evaluations: true }))
-        const evaluationsData = await getAllEvaluations()
-        console.log("Fetched evaluations:", evaluationsData)
+        // Fetch Stage 2 Stats
+        setLoading(prev => ({ ...prev, stage2: true }))
+        const s2Stats = await adminGetStage2Stats()
+        setStage2Stats(s2Stats)
+        setLoading(prev => ({ ...prev, stage2: false }))
         
-        // Get model data for populating model names
-        const modelsResponse = await fetch('/api/models/');
-        const models = await modelsResponse.json();
-        console.log("Fetched models:", models);
+        // Fetch all assignments (Cases)
+        setLoading(prev => ({ ...prev, cases: true }))
+        const assignmentsData = await adminGetAssignments()
         
-        // Create a map of model IDs to model names for quick lookup
-        const modelMap = {};
-        models.forEach(model => {
-          modelMap[model.id] = model.name;
-        });
-        
-        // Get model responses data to link model_response IDs to model IDs
-        // Since there's no direct API, we'll try to get this from case details
-        const modelResponseMap = {};
-        for (const caseItem of casesData) {
-          try {
-            const caseDetailsResponse = await fetch(`/api/cases/${caseItem.id}/details/`);
-            const caseDetails = await caseDetailsResponse.json();
-            
-            if (caseDetails && caseDetails.model_responses) {
-              caseDetails.model_responses.forEach(response => {
-                modelResponseMap[response.id] = {
-                  model: response.model,
-                  modelName: modelMap[response.model] || 'Unknown Model'
-                };
-              });
-            }
-          } catch (err) {
-            console.error(`Error fetching details for case ${caseItem.id}:`, err);
-          }
-        }
-        
-        console.log("Model response map:", modelResponseMap);
+        // Map assignments to "Cases" format
+        const mappedCases = assignmentsData.map((a: any) => ({
+            id: a.id, // Assignment ID
+            image_id: a.evaluation_set.study_id,
+        }));
+        setCases(mappedCases)
+        setLoading(prev => ({ ...prev, cases: false }))
         
         // Fetch metrics
         setLoading(prev => ({ ...prev, metrics: true }))
         const metricsData = await getMetrics()
-        console.log("Fetched metrics:", metricsData)
+
         setMetrics(metricsData)
         setLoading(prev => ({ ...prev, metrics: false }))
         
-        // Map evaluation fields correctly based on actual backend structure
-        const mappedEvaluations = evaluationsData.map(evaluation => {
-          // Get the case ID from the case assignment
-          const caseId = assignmentToCaseMap[evaluation.case_assignment] || "unknown-case";
-          
-          // Get evaluator ID from case assignment
-          const evaluatorId = caseAssignments.find(ca => ca.id === evaluation.case_assignment)?.evaluator || "unknown-evaluator";
-          
-          // Get model data from model response
-          const modelInfo = modelResponseMap[evaluation.model_response] || { model: "unknown-model", modelName: "Unknown Model" };
-          
-          return {
-            id: evaluation.id || `temp-${Math.random()}`,
-            case_id: caseId,
-            evaluator_id: evaluatorId,
-            model_id: modelInfo.model,
-            model_name: modelInfo.modelName,
-            metric_id: evaluation.metric || "unknown-metric",
-            score: evaluation.score || 0,
-            created_at: evaluation.created_at || new Date().toISOString()
-          };
-        });
-        
-        console.log("Mapped evaluations:", mappedEvaluations)
-        setEvaluations(mappedEvaluations)
+        // Fetch all evaluations
+        setLoading(prev => ({ ...prev, evaluations: true }))
+        const evaluationsData = await adminGetEvaluations()
+        setEvaluations(evaluationsData)
         setLoading(prev => ({ ...prev, evaluations: false }))
+
       } catch (err) {
         console.error('Error fetching supervisor data:', err)
         setError('Failed to load data. Please check your connection and try again.')
@@ -196,7 +140,8 @@ function SupervisorDashboard() {
           evaluations: false,
           cases: false,
           metrics: false,
-          evaluatorCases: false
+          evaluatorCases: false,
+          stage2: false
         })
       }
     }
@@ -247,7 +192,6 @@ function SupervisorDashboard() {
     }
     
     try {
-      console.log(`Fetching details for case ${caseId}`);
       const caseResponse = await fetch(`/api/cases/${caseId}/`);
       
       if (!caseResponse.ok) {
@@ -256,7 +200,7 @@ function SupervisorDashboard() {
       }
       
       const caseData = await caseResponse.json();
-      console.log(`Got case data:`, caseData);
+
       
       // Add this case to our list
       setCases(prevCases => [...prevCases, caseData]);
@@ -339,15 +283,21 @@ function SupervisorDashboard() {
               <CardTitle>Supervisor Dashboard</CardTitle>
               <CardDescription>Review evaluator performance and case evaluations</CardDescription>
             </div>
-            <Button variant="outline" onClick={goBack}>Back to Login</Button>
+            <div className="flex gap-2">
+              <Button variant="default" onClick={() => navigate('/supervisor/users')}>
+                Manage Users
+              </Button>
+              <Button variant="outline" onClick={goBack}>Back to Login</Button>
+            </div>
           </div>
         </CardHeader>
       </Card>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="evaluators">Evaluators</TabsTrigger>
-          <TabsTrigger value="evaluations">Evaluations</TabsTrigger>
+          <TabsTrigger value="evaluations">Stage 1 Evaluations</TabsTrigger>
+          <TabsTrigger value="stage2">Stage 2 Status</TabsTrigger>
           <TabsTrigger value="metrics">Metrics</TabsTrigger>
         </TabsList>
         
@@ -540,6 +490,66 @@ function SupervisorDashboard() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+
+
+        <TabsContent value="stage2">
+             <Card>
+                 <CardHeader>
+                     <CardTitle>Stage 2: AI Detection Progress</CardTitle>
+                     <CardDescription>
+                        Tracking evaluator progress on {stage2Stats?.total_images || 0} Stage 2 images.
+                     </CardDescription>
+                 </CardHeader>
+                 <CardContent>
+                     {loading.stage2 ? (
+                         <div className="flex justify-center py-8">
+                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                         </div>
+                     ) : (
+                         <Table>
+                             <TableHeader>
+                                 <TableRow>
+                                     <TableHead>Evaluator</TableHead>
+                                     <TableHead>Email</TableHead>
+                                     <TableHead>Completed</TableHead>
+                                     <TableHead>Current Progress</TableHead>
+                                 </TableRow>
+                             </TableHeader>
+                             <TableBody>
+                                 {stage2Stats?.stats?.length === 0 ? (
+                                     <TableRow>
+                                         <TableCell colSpan={4} className="text-center">No evaluator data found</TableCell>
+                                     </TableRow>
+                                 ) : (
+                                     stage2Stats?.stats?.map((stat: any) => (
+                                         <TableRow key={stat.evaluator_id}>
+                                             <TableCell className="font-medium">{stat.evaluator_name}</TableCell>
+                                             <TableCell>{stat.email}</TableCell>
+                                             <TableCell>
+                                                 <div className="flex items-center gap-2">
+                                                     <span className={stat.completed_count === stat.total_count ?("text-green-600 font-bold") : ""}>
+                                                         {stat.completed_count} / {stat.total_count}
+                                                     </span>
+                                                 </div>
+                                             </TableCell>
+                                             <TableCell>
+                                                 <div className="w-[100px] h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                     <div 
+                                                         className={`h-full ${stat.completed_count === stat.total_count ? 'bg-green-500' : 'bg-blue-500'}`} 
+                                                         style={{ width: `${stat.progress_percentage}%` }}
+                                                     />
+                                                 </div>
+                                             </TableCell>
+                                         </TableRow>
+                                     ))
+                                 )}
+                             </TableBody>
+                         </Table>
+                     )}
+                 </CardContent>
+             </Card>
         </TabsContent>
 
         <TabsContent value="metrics">

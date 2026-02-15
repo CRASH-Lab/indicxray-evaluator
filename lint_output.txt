@@ -1,0 +1,17 @@
+
+Oops! Something went wrong! :(
+
+ESLint: 9.39.2
+
+TypeError: Error while loading rule '@typescript-eslint/no-unused-expressions': Cannot read properties of undefined (reading 'allowShortCircuit')
+Occurred while linting /Users/dog/Movies/Temp/IndicXrayConsole/indicxray-evaluator/eslint.config.js
+    at Object.create (/Users/dog/Movies/Temp/IndicXrayConsole/indicxray-evaluator/node_modules/eslint/lib/rules/no-unused-expressions.js:85:5)
+    at create (/Users/dog/Movies/Temp/IndicXrayConsole/indicxray-evaluator/node_modules/@typescript-eslint/eslint-plugin/dist/rules/no-unused-expressions.js:28:32)
+    at Object.create (/Users/dog/Movies/Temp/IndicXrayConsole/indicxray-evaluator/node_modules/@typescript-eslint/utils/dist/eslint-utils/RuleCreator.js:31:20)
+    at createRuleListeners (/Users/dog/Movies/Temp/IndicXrayConsole/indicxray-evaluator/node_modules/eslint/lib/linter/linter.js:1019:15)
+    at /Users/dog/Movies/Temp/IndicXrayConsole/indicxray-evaluator/node_modules/eslint/lib/linter/linter.js:1151:7
+    at Array.forEach (<anonymous>)
+    at runRules (/Users/dog/Movies/Temp/IndicXrayConsole/indicxray-evaluator/node_modules/eslint/lib/linter/linter.js:1085:31)
+    at #flatVerifyWithoutProcessors (/Users/dog/Movies/Temp/IndicXrayConsole/indicxray-evaluator/node_modules/eslint/lib/linter/linter.js:2115:4)
+    at Linter._verifyWithFlatConfigArrayAndWithoutProcessors (/Users/dog/Movies/Temp/IndicXrayConsole/indicxray-evaluator/node_modules/eslint/lib/linter/linter.js:2203:43)
+    at Linter._verifyWithFlatConfigArray (/Users/dog/Movies/Temp/IndicXrayConsole/indicxray-evaluator/node_modules/eslint/lib/linter/linter.js:2306:15)
