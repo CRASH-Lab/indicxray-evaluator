@@ -40,7 +40,9 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        {models.map((model) => (
+        {models.map((model) => {
+          console.log(`Model ${model.id} Rendering Image URL:`, model.imageUrl);
+          return (
           <button
             key={model.id}
             onClick={() => onModelClick(model)}
@@ -70,12 +72,9 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
             {/* Image */}
             <div className="flex-1 bg-black flex items-center justify-center overflow-hidden">
               <img
-                src={getImageWithFallback(model.imageUrl, 600, 600, `model-${model.id}`)}
+                src={model.imageUrl}
                 alt={`Model ${model.modelName}`}
                 className="max-w-full max-h-full object-contain"
-                onError={(e) => {
-                  e.currentTarget.src = getImageWithFallback(null, 600, 600, `model-${model.id}`)
-                }}
               />
             </div>
 
@@ -86,7 +85,8 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
               </p>
             </div>
           </button>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

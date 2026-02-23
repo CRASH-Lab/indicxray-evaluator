@@ -36,13 +36,10 @@ export const GroundTruthPanel: React.FC<GroundTruthPanelProps> = ({
             {imageLabel}
           </div>
           <img
-            src={getImageWithFallback(imageUrl, 400, 320, 'ground-truth')}
+            src={imageUrl}
             alt="Ground Truth X-Ray"
             className="w-full h-auto object-contain"
             style={{ maxHeight: '320px' }}
-            onError={(e) => {
-              e.currentTarget.src = getImageWithFallback(null, 400, 320, 'ground-truth')
-            }}
           />
         </div>
       </div>

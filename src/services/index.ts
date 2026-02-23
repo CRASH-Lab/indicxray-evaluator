@@ -7,7 +7,7 @@ import {
   transformAssignedImagesToRecords,
 } from "./adapters";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://13.233.126.185:8000";
 
 // Get token from localStorage
 const getAuthToken = () => localStorage.getItem("authToken");
