@@ -1,8 +1,10 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { getImageWithFallback } from '@/lib/imageUtils'
+import { refreshImageUrl } from '@/services'
 
 interface GroundTruthPanelProps {
+  imageId?: string
   imageUrl: string
   groundTruth: {
     findings: string
@@ -12,10 +14,34 @@ interface GroundTruthPanelProps {
 }
 
 export const GroundTruthPanel: React.FC<GroundTruthPanelProps> = ({
+  imageId,
   imageUrl,
   groundTruth,
   imageLabel = "ORIGINAL DICOM"
 }) => {
+  const [currentUrl, setCurrentUrl] = useState(imageUrl)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  useEffect(() => {
+    setCurrentUrl(imageUrl)
+    setIsRefreshing(false)
+  }, [imageUrl])
+
+  const handleImageError = async () => {
+    if (isRefreshing || !imageId) return;
+    try {
+      setIsRefreshing(true);
+      const data = await refreshImageUrl('image', imageId);
+      if (data && data.url) {
+        setCurrentUrl(data.url);
+      }
+    } catch (e) {
+      console.error("Failed to refresh ground truth image URL", e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
   return (
     <div className="w-[400px] bg-medical-darker-gray border-r border-medical-dark-gray/30 flex flex-col h-full">
       {/* Ground Truth Badge */}
@@ -36,9 +62,13 @@ export const GroundTruthPanel: React.FC<GroundTruthPanelProps> = ({
             {imageLabel}
           </div>
           <img
-            src={imageUrl}
+            src={currentUrl}
             alt="Ground Truth X-Ray"
-            className="w-full h-auto object-contain"
+            onError={handleImageError}
+            className={cn(
+              "w-full h-auto object-contain transition-opacity duration-300",
+              isRefreshing && "opacity-50 blur-sm"
+            )}
             style={{ maxHeight: '320px' }}
           />
         </div>

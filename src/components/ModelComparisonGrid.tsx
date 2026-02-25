@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ModelOutput } from '@/types'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, ImageIcon, Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { refreshImageUrl } from '@/services'
 import { getImageWithFallback } from '@/lib/imageUtils'
 
 interface ModelComparisonGridProps {
@@ -32,6 +33,57 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
     )
   }
 
+
+  const [currentUrls, setCurrentUrls] = useState<Record<string, string>>({})
+  const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({})
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
+
+  React.useEffect(() => {
+    setCurrentUrls(prev => {
+      let isChanged = false;
+      const nextUrls = { ...prev };
+      models.forEach(m => {
+         // Only update if it's new or the backend genuinely provided a fresh URL
+         if (!nextUrls[m.id] && m.imageUrl) {
+           nextUrls[m.id] = m.imageUrl;
+           isChanged = true;
+         }
+      });
+      return isChanged ? nextUrls : prev;
+    });
+  }, [models])
+
+  const handleImageError = async (modelId: string) => {
+    if (refreshingIds.has(modelId) || loadedImages[modelId]) return;
+    
+    setRefreshingIds(prev => new Set(prev).add(modelId));
+    
+    try {
+      const data = await refreshImageUrl('model', modelId)
+      if (data && data.url) {
+        setCurrentUrls(prev => ({...prev, [modelId]: data.url}))
+      } else {
+        // Fallback applied to break loops
+        setCurrentUrls(prev => ({...prev, [modelId]: getImageWithFallback(null, 900, 900, `eval-${modelId}`)}))
+      }
+      setLoadedImages(prev => ({ ...prev, [modelId]: true }))
+    } catch (error) {
+       console.error(`Failed to refresh model image URL for ${modelId}`, error)
+       setCurrentUrls(prev => ({...prev, [modelId]: getImageWithFallback(null, 900, 900, `eval-${modelId}`)}))
+       setLoadedImages(prev => ({ ...prev, [modelId]: true }))
+    } finally {
+       setRefreshingIds(prev => {
+         const next = new Set(prev)
+         next.delete(modelId)
+         return next
+       })
+    }
+  }
+
+  const handleImageLoad = (modelId: string) => {
+    setLoadedImages(prev => ({ ...prev, [modelId]: true }))
+  }
+
   return (
     <div className="flex-1 p-6">
       <div className="mb-6">
@@ -41,13 +93,12 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
 
       <div className="grid grid-cols-3 gap-4">
         {models.map((model) => {
-          console.log(`Model ${model.id} Rendering Image URL:`, model.imageUrl);
           return (
           <button
             key={model.id}
             onClick={() => onModelClick(model)}
             className={cn(
-              "relative rounded-lg overflow-hidden transition-all",
+              "group relative rounded-lg overflow-hidden transition-all isolate",
               "border-2 hover:scale-[1.02] hover:shadow-lg",
               activeModelId === model.id
                 ? "border-medical-blue shadow-lg shadow-medical-blue/20"
@@ -57,26 +108,49 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
               "bg-medical-darkest-gray h-[280px] flex flex-col"
             )}
           >
+
+            {/* Image Placeholder & Loader */}
+            <div className="flex-1 bg-black flex items-center justify-center overflow-hidden relative">
+               {(!loadedImages[model.id] || refreshingIds.has(model.id)) && (
+                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-medical-darker-gray z-0">
+                    <Loader2 size={32} className="animate-spin text-medical-blue/70 mb-2" />
+                    <p className="text-xs text-medical-gray">Loading Preview...</p>
+                 </div>
+               )}
+               
+              <img
+                src={currentUrls[model.id] || getImageWithFallback(model.imageUrl, 900, 900, `eval-${model.id}`)}
+                alt={`Model ${model.modelName}`}
+                loading="lazy"
+                onLoad={() => handleImageLoad(model.id)}
+                onError={() => handleImageError(model.id)}
+                className={cn(
+                  "max-w-full max-h-full object-contain transition-opacity duration-500 z-10 relative",
+                  loadedImages[model.id] ? "opacity-100" : "opacity-0",
+                  refreshingIds.has(model.id) && "opacity-50 blur-sm"
+                )}
+              />
+              
+              {/* Overlay hint on hover */}
+              <div className="absolute inset-0 bg-medical-blue/10 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-col items-center justify-center pointer-events-none">
+                <div className="bg-medical-darkest-gray/90 px-4 py-2 rounded-full border border-medical-blue/50 flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
+                  <ImageIcon size={16} className="text-medical-blue" />
+                  <span className="text-sm font-medium text-white shadow-sm">Click to Evaluate</span>
+                </div>
+              </div>
+            </div>
+
             {/* Status Badge - Top Right */}
-            <div className="absolute top-3 right-3 z-10">
+            <div className="absolute top-3 right-3 z-30">
               {getStatusBadge(model.status)}
             </div>
 
             {/* Completed Checkmark - Top Left */}
             {model.status === 'completed' && (
-              <div className="absolute top-3 left-3 z-10 bg-green-500 rounded-full p-1">
+              <div className="absolute top-3 left-3 z-30 bg-green-500 rounded-full p-1 shadow-md">
                 <CheckCircle2 size={20} className="text-white" />
               </div>
             )}
-
-            {/* Image */}
-            <div className="flex-1 bg-black flex items-center justify-center overflow-hidden">
-              <img
-                src={model.imageUrl}
-                alt={`Model ${model.modelName}`}
-                className="max-w-full max-h-full object-contain"
-              />
-            </div>
 
             {/* Model Label */}
             <div className="bg-medical-dark-gray/50 border-t border-medical-dark-gray/30 p-3">

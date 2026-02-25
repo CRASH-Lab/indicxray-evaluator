@@ -547,6 +547,15 @@ async function adminGetStage2Stats() {
       return { stats: [], total_images: 0 };
   }
 }
+const refreshImageUrl = async (type: 'image' | 'model', id: string) => {
+  try {
+    const response = await instance.post('/evaluations/refresh-url/', { type, id });
+    return response.data;
+  } catch (error) {
+    console.error('refreshImageUrl Error:', error);
+    throw error;
+  }
+};
 
 export {
   login,
@@ -572,5 +581,6 @@ export {
   adminGetEvaluations,
   getStage2Images,
   saveStage2Evaluation,
-  adminGetStage2Stats
+  adminGetStage2Stats,
+  refreshImageUrl
 };

@@ -1,4 +1,4 @@
-import { getEvaluatorCasesWithDetails, getUserDetails } from '@/services'
+import { getEvaluatorAssignments, getUserDetails } from '@/services'
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -44,12 +44,11 @@ function DoctorCases() {
       setError('')
       
       try {
-        // Fetch doctor details and ALL IMAGES
-        const { getAllAssignedImages } = await import('@/services');
+        const { getEvaluatorAssignments } = await import('@/services');
         
-        const [details, imagesResponse] = await Promise.all([
+        const [details, casesResponse] = await Promise.all([
           getUserDetails(doctorId),
-          getAllAssignedImages() // Use the new endpoint
+          getEvaluatorAssignments() 
         ]);
 
         if (!isMounted) return;
@@ -69,26 +68,8 @@ function DoctorCases() {
         }
 
         // Set cases data
-        // Map images to the "DetailedCase" structure we used loosely
-        if (imagesResponse && imagesResponse.data) {
-             const mappedImages: CaseWithDetails[] = imagesResponse.data.map((img: any) => ({
-                 id: img.internalId,
-                 image_id: img.image_id,
-                 image_url: img.ground_truth_image_url || '',
-                 status: img.status,
-                 study_id: img.studyId,
-                 completed_evaluations: 0, 
-                 total_evaluations: 0,
-                 last_updated: new Date().toISOString()
-             }));
-             
-             setCasesData({
-                 cases: mappedImages,
-                 total_cases: mappedImages.length,
-                 pending_cases: 0,
-                 in_progress_cases: 0,
-                 completed_cases: 0
-             });
+        if (casesResponse) {
+             setCasesData(casesResponse);
         }
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -190,7 +171,7 @@ function DoctorCases() {
                 <div
                   key={caseItem.id}
                   className="p-4 border rounded-lg cursor-pointer hover:bg-medical-darker-gray transition-colors group"
-                  onClick={() => navigate(`/rad/all?doctorId=${doctorId}&startIndex=${index}`)}
+                  onClick={() => navigate(`/rad/${caseItem.id}?doctorId=${doctorId}`)}
                 >
                   <div className="flex justify-between items-center">
                     <div>

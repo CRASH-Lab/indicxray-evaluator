@@ -4,6 +4,7 @@ import { ModelOutput, Metric } from '@/types'
 import { X } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { getImageWithFallback } from '@/lib/imageUtils'
+import { refreshImageUrl } from '@/services'
 
 interface EvaluationOverlayProps {
   model: ModelOutput | null
@@ -44,11 +45,35 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
   existingScores = {},
 }) => {
   const [scores, setScores] = useState<Record<string, number>>(existingScores)
+  const [currentUrl, setCurrentUrl] = useState<string>('')
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Reset/Update scores when model or existingScores change
   React.useEffect(() => {
     setScores(existingScores || {})
+    if (model) {
+      setCurrentUrl(model.imageUrl || '')
+      setIsRefreshing(false)
+    }
   }, [model, existingScores])
+
+  const handleImageError = async () => {
+    if (!model || isRefreshing) return
+    setIsRefreshing(true)
+    try {
+      const data = await refreshImageUrl('model', model.id)
+      if (data && data.url) {
+        setCurrentUrl(data.url)
+      } else {
+        setCurrentUrl(getImageWithFallback(null, 900, 900, `eval-${model.id}`))
+      }
+    } catch (e) {
+      console.error("Failed to refresh image url", e)
+      setCurrentUrl(getImageWithFallback(null, 900, 900, `eval-${model.id}`))
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   if (!model) return null
 
@@ -101,12 +126,13 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
           <div className="w-1/2 bg-black border-r border-medical-dark-gray/30 flex flex-col">
             <div className="flex-1 flex items-center justify-center p-6">
               <img
-                src={getImageWithFallback(model.imageUrl, 900, 900, `eval-${model.id}`)}
+                src={currentUrl || getImageWithFallback(null, 900, 900, `eval-${model.id}`)}
                 alt={`Model ${model.modelName}`}
-                className="max-w-full max-h-full object-contain"
-                onError={(e) => {
-                  e.currentTarget.src = getImageWithFallback(null, 900, 900, `eval-${model.id}`)
-                }}
+                className={cn(
+                  "max-w-full max-h-full object-contain transition-opacity duration-300",
+                  isRefreshing && "opacity-50 blur-sm"
+                )}
+                onError={handleImageError}
               />
             </div>
           </div>
