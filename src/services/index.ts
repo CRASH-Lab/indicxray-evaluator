@@ -7,7 +7,7 @@ import {
   transformAssignedImagesToRecords,
 } from "./adapters";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://13.233.126.185:8000";
+const BASE_URL = import.meta.env.VITE_API_URL || "";
 
 // Get token from localStorage
 const getAuthToken = () => localStorage.getItem("authToken");
@@ -547,7 +547,7 @@ async function adminGetStage2Stats() {
       return { stats: [], total_images: 0 };
   }
 }
-const refreshImageUrl = async (type: 'image' | 'model', id: string) => {
+const refreshImageUrl = async (type: 'image' | 'model' | 'stage2' | 's3_record', id: string) => {
   try {
     const response = await instance.post('/evaluations/refresh-url/', { type, id });
     return response.data;

@@ -23,6 +23,9 @@ function GalleryView() {
   const [doctorName, setDoctorName] = useState('')
   const [stats, setStats] = useState({ total: 0, completed: 0 })
   
+  // Refresh state
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
+  
   // Modal state
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -81,6 +84,39 @@ function GalleryView() {
              setStats(prev => ({ ...prev, completed: prev.completed - 1 }))
           }
       }
+  }
+
+  const handleImageError = async (index: number) => {
+    const image = images[index]
+    if (!image || refreshingIds.has(image.id)) return
+
+    try {
+      setRefreshingIds((prev) => {
+        const newSet = new Set(prev)
+        newSet.add(image.id)
+        return newSet
+      })
+
+      // We added `refreshImageUrl` to services
+      const { refreshImageUrl } = await import('@/services')
+      const data = await refreshImageUrl('stage2', image.id)
+      
+      if (data && data.url) {
+        setImages((prev) => {
+          const newImages = [...prev]
+          newImages[index] = { ...newImages[index], image_url: data.url }
+          return newImages
+        })
+      }
+    } catch (error) {
+      console.error("Failed to refresh stage 2 image URL:", error)
+    } finally {
+      setRefreshingIds((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(image.id)
+        return newSet
+      })
+    }
   }
 
   const handleNext = useCallback(() => {
@@ -187,9 +223,19 @@ function GalleryView() {
                         <img 
                             src={image.image_url} 
                             alt={`X-ray ${index + 1}`} 
-                            className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity"
+                            className={cn(
+                                "object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity",
+                                refreshingIds.has(image.id) && "opacity-50 blur-sm"
+                            )}
                             loading="lazy"
+                            onError={() => handleImageError(index)}
                         />
+                        
+                        {refreshingIds.has(image.id) && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-20">
+                                <Loader2 className="w-6 h-6 animate-spin text-white" />
+                            </div>
+                        )}
                         
                         {/* Status Validations Overlay */}
                         {image.score !== null && (
@@ -252,8 +298,19 @@ function GalleryView() {
                             <img 
                                 src={images[selectedIndex].image_url} 
                                 alt="Detail View" 
-                                className="max-w-full max-h-full object-contain pointer-events-none select-none" // prevent img drag interfering with swipe
+                                className={cn(
+                                    "max-w-full max-h-full object-contain pointer-events-none select-none transition-opacity",
+                                    refreshingIds.has(images[selectedIndex].id) && "opacity-50 blur-sm"
+                                )} // prevent img drag interfering with swipe
+                                onError={() => handleImageError(selectedIndex)}
                             />
+                            
+                            {refreshingIds.has(images[selectedIndex].id) && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 z-20">
+                                    <Loader2 className="w-12 h-12 animate-spin text-white mb-4" />
+                                    <p className="text-white text-sm">Refreshing secure URL...</p>
+                                </div>
+                            )}
                             
                             {/* Mobile Navigation Overlays */}
                             <Button

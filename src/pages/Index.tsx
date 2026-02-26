@@ -323,6 +323,7 @@ const Index = (props: Props) => {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Ground Truth */}
         <GroundTruthPanel
+          imageId={currentImage.internalId}
           imageUrl={currentImage.imageUrl}
           groundTruth={currentImage.groundTruth}
         />
