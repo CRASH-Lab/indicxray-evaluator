@@ -549,7 +549,7 @@ async function adminGetStage2Stats() {
 }
 const refreshImageUrl = async (type: 'image' | 'model' | 'stage2' | 's3_record', id: string) => {
   try {
-    const response = await instance.post('/evaluations/refresh-url/', { type, id });
+    const response = await instance.post('evaluations/refresh-url/', { type, id });
     return response.data;
   } catch (error) {
     console.error('refreshImageUrl Error:', error);
