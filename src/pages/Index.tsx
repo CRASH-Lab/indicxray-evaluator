@@ -5,6 +5,7 @@ import { GroundTruthPanel } from '@/components/ImageNavigationSidebar'
 import { ModelComparisonGrid } from '@/components/ModelComparisonGrid'
 import { EvaluationOverlay } from '@/components/EvaluationOverlay'
 import { CaseRecord, ModelOutput, Metric } from '@/types'
+import { CaseNavigationContext } from '@/hooks/use-case-navigation'
 import { getMetrics, getUserDetails } from '@/services'
 import { useToast } from '@/hooks/use-toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -13,6 +14,7 @@ import { Progress } from '@/components/ui/progress'
 
 interface Props {
   records: any[] // Legacy prop, not used in v2
+  caseNavigation?: CaseNavigationContext
 }
 
 const EMPTY_SCORES: Record<string, number> = {}
@@ -20,6 +22,7 @@ const EMPTY_SCORES: Record<string, number> = {}
 const Index = (props: Props) => {
   const { toast } = useToast()
   const navigate = useNavigate()
+  const { caseNavigation } = props
   
   // State
   const [caseRecord, setCaseRecord] = useState<CaseRecord | null>(null)
@@ -287,28 +290,61 @@ const Index = (props: Props) => {
           </div>
         </div>
         
-        {/* Center - Image Navigation */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handlePrevImage}
-            disabled={activeImageIndex === 0}
-            className="p-2 rounded-lg hover:bg-medical-dark-gray/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-lg font-bold"
-          >
-            ←
-          </button>
-          <div className="bg-medical-darkest-gray border border-medical-dark-gray rounded-lg px-4 py-2 min-w-[140px]">
-            <p className="text-xs text-medical-gray mb-0.5 text-center">Current Image</p>
-            <p className="text-sm font-semibold text-center">
-              Image {activeImageIndex + 1} of {caseRecord.images.length}
-            </p>
-          </div>
-          <button
-            onClick={handleNextImage}
-            disabled={activeImageIndex === caseRecord.images.length - 1}
-            className="p-2 rounded-lg hover:bg-medical-dark-gray/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-lg font-bold"
-          >
-            →
-          </button>
+        {/* Center - Case & Image Navigation */}
+        <div className="flex items-center gap-4">
+          {/* Case-level navigation (between assignments) */}
+          {caseNavigation?.isAvailable && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={caseNavigation.goToPrevCase}
+                disabled={!caseNavigation.hasPrev}
+                className="p-2 rounded-lg hover:bg-medical-dark-gray/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-lg font-bold"
+                title="Previous case"
+              >
+                ←
+              </button>
+              <div className="bg-medical-darkest-gray border border-medical-dark-gray rounded-lg px-4 py-2 min-w-[140px]">
+                <p className="text-xs text-medical-gray mb-0.5 text-center">Current Case</p>
+                <p className="text-sm font-semibold text-center">
+                  Case {caseNavigation.currentIndex + 1} of {caseNavigation.totalCases}
+                </p>
+              </div>
+              <button
+                onClick={caseNavigation.goToNextCase}
+                disabled={!caseNavigation.hasNext}
+                className="p-2 rounded-lg hover:bg-medical-dark-gray/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-lg font-bold"
+                title="Next case"
+              >
+                →
+              </button>
+            </div>
+          )}
+
+          {/* Image-level navigation (within a single assignment — only show if multiple images) */}
+          {caseRecord.images.length > 1 && (
+            <div className="flex items-center gap-2">
+              <div className="w-px h-8 bg-medical-dark-gray/40" /> {/* divider */}
+              <button
+                onClick={handlePrevImage}
+                disabled={activeImageIndex === 0}
+                className="p-2 rounded-lg hover:bg-medical-dark-gray/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm font-bold"
+              >
+                ‹
+              </button>
+              <div className="bg-medical-darkest-gray border border-medical-dark-gray/50 rounded-lg px-3 py-1.5">
+                <p className="text-xs text-medical-gray text-center">
+                  Image {activeImageIndex + 1} of {caseRecord.images.length}
+                </p>
+              </div>
+              <button
+                onClick={handleNextImage}
+                disabled={activeImageIndex === caseRecord.images.length - 1}
+                className="p-2 rounded-lg hover:bg-medical-dark-gray/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm font-bold"
+              >
+                ›
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-8">

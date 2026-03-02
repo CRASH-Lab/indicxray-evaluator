@@ -1,5 +1,6 @@
 // Simplified hook usage
 import useRecords from '@/hooks/use-records'
+import useCaseNavigation from '@/hooks/use-case-navigation'
 import { useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import Index from './Index'
@@ -14,7 +15,8 @@ function IndexWrapper() {
   // For now let's pass 'all' if we want unified list.
   
   // Actually, we'll modify useRecords next to handle 'all'
-  const records = useRecords(radId || 'all') // Default to 'all' if undefined? 
+  const records = useRecords(radId || 'all')
+  const caseNav = useCaseNavigation(radId)
   // No, radId is required by route /rad/:radId
   // The dashboard should link to /rad/all
   
@@ -115,7 +117,7 @@ function IndexWrapper() {
           </p>
         </div>
       )} */}
-      <Index records={records} />
+      <Index records={records} caseNavigation={caseNav} />
     </div>
   )
 }

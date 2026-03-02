@@ -6,15 +6,16 @@ import { useToast } from '@/hooks/use-toast'
 function useRecords(radId: string) {
   const [records, setRecords] = useState<Record[] | null>(null)
   const [error, setError] = useState<Error | null>(null)
-  const runOnceRef = useRef(false)
+  const lastFetchedIdRef = useRef<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
-    if (runOnceRef.current || !radId) {
+    if (!radId || lastFetchedIdRef.current === radId) {
       return
     }
 
-    runOnceRef.current = true
+    lastFetchedIdRef.current = radId
+    setRecords(null) // Reset for clean loading state on case switch
 
     
     ;(async () => {

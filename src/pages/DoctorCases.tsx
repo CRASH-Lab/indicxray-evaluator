@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, User, Loader2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { saveCaseNavigationManifest } from '@/hooks/use-case-navigation'
 
 interface CaseWithDetails {
   id: string
@@ -90,6 +91,13 @@ function DoctorCases() {
   }, [doctorId]);
 
   function navigateToCase(caseId: string) {
+    // Persist ordered assignment IDs so the evaluation page can do next/prev
+    if (casesData?.cases) {
+      saveCaseNavigationManifest({
+        assignmentIds: casesData.cases.map(c => c.id),
+        doctorId: doctorId || '',
+      });
+    }
     navigate(`/rad/${caseId}?doctorId=${doctorId}`);
   }
 
@@ -171,7 +179,7 @@ function DoctorCases() {
                 <div
                   key={caseItem.id}
                   className="p-4 border rounded-lg cursor-pointer hover:bg-medical-darker-gray transition-colors group"
-                  onClick={() => navigate(`/rad/${caseItem.id}?doctorId=${doctorId}`)}
+                  onClick={() => navigateToCase(caseItem.id)}
                 >
                   <div className="flex justify-between items-center">
                     <div>
