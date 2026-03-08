@@ -10,14 +10,12 @@ interface GroundTruthPanelProps {
     findings: string
     impressions: string
   }
-  imageLabel?: string
 }
 
 export const GroundTruthPanel: React.FC<GroundTruthPanelProps> = ({
   imageId,
   imageUrl,
-  groundTruth,
-  imageLabel = "ORIGINAL DICOM"
+  groundTruth
 }) => {
   const [currentUrl, setCurrentUrl] = useState(imageUrl)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -58,9 +56,6 @@ export const GroundTruthPanel: React.FC<GroundTruthPanelProps> = ({
       {/* X-Ray Image */}
       <div className="flex-shrink-0 bg-black border-b border-medical-dark-gray/30">
         <div className="relative">
-          <div className="absolute top-3 left-3 bg-medical-darkest-gray/90 px-2 py-1 rounded text-xs font-medium text-medical-gray z-10">
-            {imageLabel}
-          </div>
           <img
             src={currentUrl}
             alt="Ground Truth X-Ray"
@@ -93,23 +88,6 @@ export const GroundTruthPanel: React.FC<GroundTruthPanelProps> = ({
             <p className="text-sm text-foreground leading-relaxed">
               {groundTruth.impressions}
             </p>
-          </div>
-        </div>
-
-        {/* Patient Metadata */}
-        <div className="pt-4 border-t border-medical-dark-gray/30">
-          <h3 className="text-xs font-medium text-medical-gray uppercase mb-3">
-            PATIENT METADATA
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-medical-darkest-gray p-2 rounded">
-              <p className="text-xs text-medical-gray">Age/Sex</p>
-              <p className="text-sm font-medium">45 / M</p>
-            </div>
-            <div className="bg-medical-darkest-gray p-2 rounded">
-              <p className="text-xs text-medical-gray">View</p>
-              <p className="text-sm font-medium">PA Upright</p>
-            </div>
           </div>
         </div>
       </div>
