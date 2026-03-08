@@ -35,7 +35,7 @@ const App = () => (
           <Route path="/rad/:radId" element={<IndexWrapper />} />
           
           {/* Stage 2 Routes */}
-          <Route path="/doctor/:doctorId/gallery" element={<GalleryView />} />
+          <Route path="/stage2/:doctorId" element={<GalleryView />} />
           
           {/* Supervisor routes */}
           <Route path="/supervisor" element={<SupervisorLogin />} />

@@ -512,9 +512,10 @@ async function adminGetEvaluations() {
 }
 
 // Stage 2 Functions
-async function getStage2Images() {
+async function getStage2Images(doctorId?: string) {
   try {
-    const response = await instance.get("stage2/images/");
+    const url = doctorId ? `stage2/images/?doctor_id=${doctorId}` : "stage2/images/";
+    const response = await instance.get(url);
     return response.data;
   } catch (error) {
     console.error("Error fetching Stage 2 images:", error);

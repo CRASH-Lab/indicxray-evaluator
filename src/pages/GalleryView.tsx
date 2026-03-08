@@ -35,7 +35,7 @@ function GalleryView() {
       try {
         const [userData, imagesData] = await Promise.all([
              getUserDetails(doctorId),
-             getStage2Images()
+             getStage2Images(doctorId)
         ])
         
         setDoctorName(userData.name)

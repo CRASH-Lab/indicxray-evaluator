@@ -41,7 +41,7 @@ function StageSelection() {
         </Card>
 
         {/* Stage 2 Option */}
-        <Card className="hover:border-primary/50 transition-colors cursor-pointer bg-medical-dark-gray border-medical-gray" onClick={() => navigate(`/doctor/${userId}/gallery`)}>
+        <Card className="hover:border-primary/50 transition-colors cursor-pointer bg-medical-dark-gray border-medical-gray" onClick={() => navigate(`/stage2/${userId}`)}>
           <CardHeader className="text-center pb-2">
             <div className="mx-auto bg-purple-500/10 p-4 rounded-full w-fit mb-4">
               <BrainCircuit className="w-12 h-12 text-purple-400" />
