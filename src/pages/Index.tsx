@@ -389,6 +389,8 @@ const Index = (props: Props) => {
       <EvaluationOverlay
         model={activeModel}
         metrics={metrics}
+        groundTruthImage={currentImage?.imageUrl}
+        groundTruthImageId={currentImage?.internalId || currentImage?.imageId}
         onClose={() => setActiveModel(null)}
         onSave={handleSaveEvaluation}
         existingScores={activeModel ? (evaluationData[activeModel.id] || EMPTY_SCORES) : EMPTY_SCORES}

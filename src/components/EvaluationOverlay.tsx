@@ -9,6 +9,8 @@ import { refreshImageUrl } from '@/services'
 interface EvaluationOverlayProps {
   model: ModelOutput | null
   metrics: Metric[]
+  groundTruthImage?: string
+  groundTruthImageId?: string
   onClose: () => void
   onSave: (modelId: string, scores: Record<string, number>) => void
   existingScores?: Record<string, number>
@@ -40,22 +42,32 @@ const METRIC_GUIDELINES: Record<string, { 1: string; 0: string }> = {
 export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
   model,
   metrics,
+  groundTruthImage,
+  groundTruthImageId,
   onClose,
   onSave,
   existingScores = {},
 }) => {
   const [scores, setScores] = useState<Record<string, number>>(existingScores)
-  const [currentUrl, setCurrentUrl] = useState<string>('')
+  const [currentUrl, setCurrentUrl] = useState<string>(model?.imageUrl || '')
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [currentGroundTruthUrl, setCurrentGroundTruthUrl] = useState<string>(groundTruthImage || '')
+  const [isGroundTruthRefreshing, setIsGroundTruthRefreshing] = useState(false)
 
   // Reset/Update scores when model or existingScores change
   React.useEffect(() => {
     setScores(existingScores || {})
     if (model) {
-      setCurrentUrl(model.imageUrl || '')
+      setCurrentUrl(model.imageUrl)
       setIsRefreshing(false)
     }
   }, [model, existingScores])
+
+  React.useEffect(() => {
+    if (groundTruthImage) {
+      setCurrentGroundTruthUrl(groundTruthImage);
+    }
+  }, [groundTruthImage])
 
   const handleImageError = async () => {
     if (!model || isRefreshing) return
@@ -72,6 +84,24 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
       setCurrentUrl(getImageWithFallback(null, 900, 900, `eval-${model.id}`))
     } finally {
       setIsRefreshing(false)
+    }
+  }
+
+  const handleGroundTruthError = async () => {
+    if (!groundTruthImageId || isGroundTruthRefreshing) return
+    setIsGroundTruthRefreshing(true)
+    try {
+      const data = await refreshImageUrl('image', groundTruthImageId)
+      if (data && data.url) {
+        setCurrentGroundTruthUrl(data.url)
+      } else {
+        setCurrentGroundTruthUrl(getImageWithFallback(null, 900, 900, `eval-gt-${groundTruthImageId}`))
+      }
+    } catch (e) {
+      console.error("Failed to refresh ground truth image url", e)
+      setCurrentGroundTruthUrl(getImageWithFallback(null, 900, 900, `eval-gt-${groundTruthImageId}`))
+    } finally {
+      setIsGroundTruthRefreshing(false)
     }
   }
 
@@ -104,7 +134,7 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
 
   return (
     <Dialog open={!!model} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl h-[90vh] p-0 bg-medical-darkest-gray border-2 border-medical-blue/50 flex flex-col [&>button]:hidden">
+      <DialogContent className="max-w-[95vw] h-[95vh] p-0 bg-medical-darkest-gray border-2 border-medical-blue/50 flex flex-col [&>button]:hidden">
         {/* Header */}
         <div className="bg-medical-blue px-6 py-4 flex items-center justify-between border-b border-medical-blue/50">
           <div>
@@ -122,23 +152,55 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
 
         {/* Content - Side by Side Layout */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Left Side - Image */}
-          <div className="w-1/2 bg-black border-r border-medical-dark-gray/30 flex flex-col">
-            <div className="flex-1 flex items-center justify-center p-6">
-              <img
-                src={currentUrl || getImageWithFallback(null, 900, 900, `eval-${model.id}`)}
-                alt={`Model ${model.modelName}`}
-                className={cn(
-                  "max-w-full max-h-full object-contain transition-opacity duration-300",
-                  isRefreshing && "opacity-50 blur-sm"
+          {/* Left Side - Images */}
+          <div className="w-2/3 bg-black border-r border-medical-dark-gray/30 flex relative">
+            {/* Ground Truth Image */}
+            <div className="flex-1 flex flex-col relative border-r border-medical-dark-gray/50">
+              <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-black/60 rounded text-sm font-medium text-white backdrop-blur-sm border border-white/10">
+                Ground Truth
+              </div>
+              <div className="flex-1 flex items-center justify-center p-6">
+                {currentGroundTruthUrl ? (
+                  <img
+                    src={currentGroundTruthUrl}
+                    alt="Ground Truth"
+                    className={cn(
+                      "max-w-full max-h-full object-contain transition-opacity duration-300",
+                      isGroundTruthRefreshing && "opacity-50 blur-sm"
+                    )}
+                    onError={handleGroundTruthError}
+                  />
+                ) : (
+                  <div className="text-medical-gray">No ground truth image available</div>
                 )}
-                onError={handleImageError}
-              />
+              </div>
+            </div>
+
+            {/* Evaluated Image */}
+            <div className="flex-1 flex flex-col relative">
+              <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-medical-blue/80 rounded text-sm font-medium text-white backdrop-blur-sm border border-medical-blue">
+                Model Output ({model.modelName})
+              </div>
+              <div className="flex-1 flex items-center justify-center p-6">
+                {currentUrl ? (
+                  <img
+                    src={currentUrl}
+                    alt={`Model ${model.modelName}`}
+                    className={cn(
+                      "max-w-full max-h-full object-contain transition-opacity duration-300",
+                      isRefreshing && "opacity-50 blur-sm"
+                    )}
+                    onError={handleImageError}
+                  />
+                ) : (
+                  <div className="text-medical-gray">No image available</div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Right Side - Model Response & Evaluation Metrics */}
-          <div className="w-1/2 flex flex-col overflow-y-auto">
+          <div className="w-1/3 flex flex-col overflow-y-auto">
             <div className="p-6 space-y-6">
               {/* Model Response */}
               <div className="bg-medical-dark-gray/30 rounded-lg border border-medical-dark-gray/30 p-4">
