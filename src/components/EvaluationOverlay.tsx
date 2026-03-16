@@ -53,6 +53,21 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [currentGroundTruthUrl, setCurrentGroundTruthUrl] = useState<string>(groundTruthImage || '')
   const [isGroundTruthRefreshing, setIsGroundTruthRefreshing] = useState(false)
+  const [zoom, setZoom] = useState({
+    groundTruth: 1,
+    model: 1,
+  })
+  const [panOffsets, setPanOffsets] = useState({
+    groundTruth: { x: 0, y: 0 },
+    model: { x: 0, y: 0 },
+  })
+  const [activePan, setActivePan] = useState<{
+    type: 'groundTruth' | 'model'
+    startX: number
+    startY: number
+    origX: number
+    origY: number
+  } | null>(null)
 
   // Reset/Update scores when model or existingScores change
   React.useEffect(() => {
@@ -105,6 +120,40 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
     }
   }
 
+  const handlePanStart = (
+    type: 'groundTruth' | 'model',
+    event: React.MouseEvent<HTMLDivElement>
+  ) => {
+    event.preventDefault()
+    setActivePan({
+      type,
+      startX: event.clientX,
+      startY: event.clientY,
+      origX: panOffsets[type].x,
+      origY: panOffsets[type].y,
+    })
+  }
+
+  const handlePanMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!activePan) return
+
+    const deltaX = event.clientX - activePan.startX
+    const deltaY = event.clientY - activePan.startY
+
+    setPanOffsets((prev) => ({
+      ...prev,
+      [activePan.type]: {
+        x: activePan.origX + deltaX,
+        y: activePan.origY + deltaY,
+      },
+    }))
+  }
+
+  const handlePanEnd = () => {
+    if (!activePan) return
+    setActivePan(null)
+  }
+
   if (!model) return null
 
   const handleScoreSelect = (metricId: string, score: number) => {
@@ -153,48 +202,148 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
         {/* Content - Side by Side Layout */}
         <div className="flex-1 flex overflow-hidden">
           {/* Left Side - Images */}
-          <div className="w-2/3 bg-black border-r border-medical-dark-gray/30 flex relative">
+          <div className="w-2/3 bg-black border-r border-medical-dark-gray/30 flex relative flex-col">
+            <div className="flex-1 flex overflow-hidden">
             {/* Ground Truth Image */}
-            <div className="flex-1 flex flex-col relative border-r border-medical-dark-gray/50">
-              <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-black/60 rounded text-sm font-medium text-white backdrop-blur-sm border border-white/10">
-                Ground Truth
-              </div>
-              <div className="flex-1 flex items-center justify-center p-6">
-                {currentGroundTruthUrl ? (
-                  <img
-                    src={currentGroundTruthUrl}
-                    alt="Ground Truth"
-                    className={cn(
-                      "max-w-full max-h-full object-contain transition-opacity duration-300",
-                      isGroundTruthRefreshing && "opacity-50 blur-sm"
-                    )}
-                    onError={handleGroundTruthError}
+              <div className="flex-1 flex flex-col relative border-r border-medical-dark-gray/50">
+                <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-black/60 rounded text-sm font-medium text-white backdrop-blur-sm border border-white/10">
+                  Ground Truth
+                </div>
+                <div className="flex-1 flex items-center justify-center p-6">
+                  {currentGroundTruthUrl ? (
+                    <div
+                      className="relative max-w-full max-h-full overflow-hidden cursor-grab active:cursor-grabbing bg-black"
+                      onMouseDown={(e) => handlePanStart('groundTruth', e)}
+                      onMouseMove={handlePanMove}
+                      onMouseUp={handlePanEnd}
+                      onMouseLeave={handlePanEnd}
+                    >
+                      <div
+                        style={{
+                          transform: `translate(${panOffsets.groundTruth.x}px, ${panOffsets.groundTruth.y}px) scale(${zoom.groundTruth})`,
+                          transformOrigin: 'center center',
+                          transition: activePan ? 'none' : 'transform 150ms ease-out',
+                        }}
+                      >
+                        <img
+                          src={currentGroundTruthUrl}
+                          alt="Ground Truth"
+                          className={cn(
+                            "max-w-full max-h-full object-contain select-none pointer-events-none",
+                            isGroundTruthRefreshing && "opacity-50 blur-sm",
+                          )}
+                          onError={handleGroundTruthError}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-medical-gray">No ground truth image available</div>
+                  )}
+                </div>
+                {/* Ground Truth Zoom Controls */}
+                <div className="w-full px-6 pb-4 flex items-center gap-3">
+                  <span className="text-[10px] font-medium text-medical-gray uppercase tracking-wide">
+                    GT Zoom
+                  </span>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={3}
+                    step={0.1}
+                    value={zoom.groundTruth}
+                    onChange={(e) =>
+                      setZoom((prev) => ({ ...prev, groundTruth: parseFloat(e.target.value) }))
+                    }
+                    className="flex-1 accent-medical-blue"
                   />
-                ) : (
-                  <div className="text-medical-gray">No ground truth image available</div>
-                )}
+                  <span className="text-[10px] text-medical-gray w-10 text-right">
+                    {zoom.groundTruth.toFixed(1)}x
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setZoom((prev) => ({ ...prev, groundTruth: 1 }))
+                      setPanOffsets((prev) => ({
+                        ...prev,
+                        groundTruth: { x: 0, y: 0 },
+                      }))
+                    }}
+                    className="px-2 py-1 text-[10px] font-medium rounded-md border border-medical-dark-gray/60 text-medical-gray hover:text-foreground hover:bg-medical-dark-gray/60 transition-colors"
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Evaluated Image */}
-            <div className="flex-1 flex flex-col relative">
-              <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-medical-blue/80 rounded text-sm font-medium text-white backdrop-blur-sm border border-medical-blue">
-                Model Output ({model.modelName})
-              </div>
-              <div className="flex-1 flex items-center justify-center p-6">
-                {currentUrl ? (
-                  <img
-                    src={currentUrl}
-                    alt={`Model ${model.modelName}`}
-                    className={cn(
-                      "max-w-full max-h-full object-contain transition-opacity duration-300",
-                      isRefreshing && "opacity-50 blur-sm"
-                    )}
-                    onError={handleImageError}
+              {/* Evaluated Image */}
+              <div className="flex-1 flex flex-col relative">
+                <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-medical-blue/80 rounded text-sm font-medium text-white backdrop-blur-sm border border-medical-blue">
+                  Model Output ({model.modelName})
+                </div>
+                <div className="flex-1 flex items-center justify-center p-6">
+                  {currentUrl ? (
+                    <div
+                      className="relative max-w-full max-h-full overflow-hidden cursor-grab active:cursor-grabbing bg-black"
+                      onMouseDown={(e) => handlePanStart('model', e)}
+                      onMouseMove={handlePanMove}
+                      onMouseUp={handlePanEnd}
+                      onMouseLeave={handlePanEnd}
+                    >
+                      <div
+                        style={{
+                          transform: `translate(${panOffsets.model.x}px, ${panOffsets.model.y}px) scale(${zoom.model})`,
+                          transformOrigin: 'center center',
+                          transition: activePan ? 'none' : 'transform 150ms ease-out',
+                        }}
+                      >
+                        <img
+                          src={currentUrl}
+                          alt={`Model ${model.modelName}`}
+                          className={cn(
+                            "max-w-full max-h-full object-contain select-none pointer-events-none",
+                            isRefreshing && "opacity-50 blur-sm",
+                          )}
+                          onError={handleImageError}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-medical-gray">No image available</div>
+                  )}
+                </div>
+                {/* Model Zoom Controls */}
+                <div className="w-full px-6 pb-4 flex items-center gap-3">
+                  <span className="text-[10px] font-medium text-medical-gray uppercase tracking-wide">
+                    Model Zoom
+                  </span>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={3}
+                    step={0.1}
+                    value={zoom.model}
+                    onChange={(e) =>
+                      setZoom((prev) => ({ ...prev, model: parseFloat(e.target.value) }))
+                    }
+                    className="flex-1 accent-medical-blue"
                   />
-                ) : (
-                  <div className="text-medical-gray">No image available</div>
-                )}
+                  <span className="text-[10px] text-medical-gray w-10 text-right">
+                    {zoom.model.toFixed(1)}x
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setZoom((prev) => ({ ...prev, model: 1 }))
+                      setPanOffsets((prev) => ({
+                        ...prev,
+                        model: { x: 0, y: 0 },
+                      }))
+                    }}
+                    className="px-2 py-1 text-[10px] font-medium rounded-md border border-medical-dark-gray/60 text-medical-gray hover:text-foreground hover:bg-medical-dark-gray/60 transition-colors"
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
             </div>
           </div>
