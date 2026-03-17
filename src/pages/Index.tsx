@@ -269,8 +269,6 @@ const Index = (props: Props) => {
     }
   }
 
-  const completedImages = caseRecord.images.filter(img => img.evaluationStatus === 'completed').length
-
   return (
     <div className="h-screen flex flex-col bg-medical-darkest-gray text-foreground overflow-hidden">
       {/* Header */}
@@ -377,12 +375,25 @@ const Index = (props: Props) => {
         <div className="flex-1 max-w-md">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">
-              Image {activeImageIndex + 1} Progress: {currentImage.completedModels}/{currentImage.totalModels} Models
+              Image {activeImageIndex + 1} of {caseRecord.images.length} — {currentImage.completedModels}/{currentImage.totalModels} Models
+            </span>
+            <span className="text-sm text-medical-gray">
+              {caseRecord.images.filter(img => img.evaluationStatus === 'completed').length}/{caseRecord.images.length} images complete
             </span>
           </div>
           <Progress value={caseRecord.totalProgress} className="h-2" />
         </div>
 
+        {/* Nudge the evaluator to the next image when current image is done but more remain */}
+        {currentImage.completedModels === currentImage.totalModels &&
+          activeImageIndex < caseRecord.images.length - 1 && (
+          <Button
+            onClick={handleNextImage}
+            className="ml-6 bg-medical-blue hover:bg-medical-blue/90 text-white"
+          >
+            Next Image →
+          </Button>
+        )}
       </div>
 
       {/* Evaluation Overlay */}

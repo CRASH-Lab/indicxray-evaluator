@@ -20,12 +20,14 @@ export const transformAssignmentToRecords = (
   if (data.images && Array.isArray(data.images)) {
     const metricKeyMap = createMetricKeyMap(metrics);
 
+    const studyId = data.evaluation_set?.study_id;
     data.images.forEach((img: any) => {
       records.push({
         id: assignmentId,
         internalId: img.id,
         imageUrl: img.ground_truth_image_url,
         image_id: img.image_id,
+        studyId,
         status: img.progress.status,
         
         modelOutputs: (img.model_outputs || []).map((mo: any) => {
@@ -137,7 +139,7 @@ export const transformRecordsToCase = (records: any[]): {
   
   const newCase: CaseRecord = {
     id: 'unified-worklist',
-    studyId: 'Unified Worklist',
+    studyId: records[0]?.studyId || 'Unified Worklist',
     totalProgress: 0,
     images: records.map((rec, index) => ({
         imageIndex: index,

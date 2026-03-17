@@ -179,6 +179,8 @@ interface CaseWithDetails {
   status: string;
   completed_evaluations: number;
   total_evaluations: number;
+  completed_images: number;
+  total_images: number;
   last_updated: string;
   // Additional fields from assignment details
   evaluation_set_id?: string;
@@ -244,10 +246,21 @@ async function getEvaluatorAssignments(): Promise<CasesResponse> {
         // Based on DoctorCases.tsx, it iterates over "cases".
         // Let's assume user wants to see individual assignments.
 
-        const status = assignment.status;
+        const completedImages = assignment.progress?.completed_images ?? 0;
+        const totalImages = assignment.progress?.total_images ?? 0;
+        const completedEvals = assignment.progress?.completed_evaluations ?? 0;
 
-        if (status === "completed") completed++;
-        else if (status === "in_progress") inProgress++;
+        // Use completed_images as the completion signal — it's tracked per image
+        // and doesn't depend on the metric count (which could change).
+        const effectiveStatus =
+          totalImages > 0 && completedImages >= totalImages
+            ? "completed"
+            : completedEvals > 0
+            ? "in_progress"
+            : "pending";
+
+        if (effectiveStatus === "completed") completed++;
+        else if (effectiveStatus === "in_progress") inProgress++;
         else pending++;
 
         total++;
@@ -256,9 +269,11 @@ async function getEvaluatorAssignments(): Promise<CasesResponse> {
           id: assignment.id,
           image_id: assignment.evaluation_set.study_id, // Using Study ID as display name
           image_url: "", // Placeholder
-          status: status,
+          status: effectiveStatus,
           completed_evaluations: assignment.progress.completed_evaluations,
           total_evaluations: assignment.progress.total_evaluations,
+          completed_images: assignment.progress.completed_images,
+          total_images: assignment.progress.total_images,
           last_updated: assignment.last_activity_at || assignment.assigned_at,
           evaluation_set_id: assignment.evaluation_set.id,
           study_id: assignment.evaluation_set.study_id,

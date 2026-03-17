@@ -16,6 +16,8 @@ interface CaseWithDetails {
   study_id?: string
   completed_evaluations: number
   total_evaluations: number
+  completed_images: number
+  total_images: number
   last_updated?: string
 }
 
@@ -187,7 +189,7 @@ function DoctorCases() {
                         Case {index + 1}: {caseItem.image_id}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1 group-hover:text-white/70">
-                        Progress: {caseItem.completed_evaluations} of {caseItem.total_evaluations} evaluations completed
+                        Progress: {Math.floor(caseItem.completed_evaluations / 5)} of {caseItem.total_evaluations / 5} models evaluated
                       </div>
                     </div>
                     <div className={`px-3 py-1 rounded-full text-sm ${

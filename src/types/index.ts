@@ -35,6 +35,7 @@ export interface Record {
   internalId?: string; // Internal UUID for API calls
   imageUrl: string;
   image_id?: string;
+  studyId?: string;
   status?: string;
   modelOutputs: Array<{
     responseId: string;
