@@ -516,13 +516,30 @@ async function adminGetAssignments() {
   }
 }
 
-async function adminGetEvaluations() {
+async function adminGetEvaluations(params?: {
+  page?: number;
+  pageSize?: number;
+  evaluatorId?: string | null;
+}) {
   try {
-    const response = await instance.get("admin/evaluations/");
+    const response = await instance.get("admin/evaluations/", {
+      params: {
+        page: params?.page ?? 1,
+        page_size: params?.pageSize ?? 100,
+        ...(params?.evaluatorId ? { evaluator_id: params.evaluatorId } : {}),
+      },
+    });
     return response.data;
   } catch (error) {
     console.error("Error fetching admin evaluations:", error);
-    return [];
+    return {
+      count: 0,
+      next: null,
+      previous: null,
+      page: 1,
+      page_size: 100,
+      results: [],
+    };
   }
 }
 
@@ -560,7 +577,12 @@ async function adminGetStage2Stats() {
       return response.data;
   } catch (error) {
       console.error("Error fetching Stage 2 stats:", error);
-      return { stats: [], total_images: 0 };
+      return {
+        stats: [],
+        total_images: 0,
+        assigned_images_per_evaluator: null,
+        global_image_pool: 0,
+      };
   }
 }
 const refreshImageUrl = async (type: 'image' | 'model' | 'stage2' | 's3_record', id: string) => {

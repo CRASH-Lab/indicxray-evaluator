@@ -1,7 +1,8 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Stethoscope, BrainCircuit } from 'lucide-react'
+import { Stethoscope } from 'lucide-react'
+// import { BrainCircuit } from 'lucide-react'
 
 function StageSelection() {
   const { userId } = useParams()
@@ -24,7 +25,7 @@ function StageSelection() {
       
       <h1 className="text-3xl font-bold text-center mb-10 text-white">Select Evaluation Stage</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 gap-8">
         
         {/* Stage 1 Option */}
         <Card className="hover:border-primary/50 transition-colors cursor-pointer bg-medical-dark-gray border-medical-gray" onClick={() => navigate(`/doctor/${userId}`)}>
@@ -40,7 +41,8 @@ function StageSelection() {
           </CardContent>
         </Card>
 
-        {/* Stage 2 Option */}
+        {/* Stage 2 is temporarily hidden for evaluators. Keep this block for easy re-enable later. */}
+        {/*
         <Card className="hover:border-primary/50 transition-colors cursor-pointer bg-medical-dark-gray border-medical-gray" onClick={() => navigate(`/stage2/${userId}`)}>
           <CardHeader className="text-center pb-2">
             <div className="mx-auto bg-purple-500/10 p-4 rounded-full w-fit mb-4">
@@ -53,7 +55,7 @@ function StageSelection() {
             <Button className="w-full bg-purple-600 hover:bg-purple-700">Enter Stage 2</Button>
           </CardContent>
         </Card>
-
+        */}
       </div>
     </div>
   )

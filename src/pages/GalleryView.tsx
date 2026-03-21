@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
@@ -18,6 +18,7 @@ interface Stage2Image {
 function GalleryView() {
   const { doctorId } = useParams()
   const navigate = useNavigate()
+  const userRole = localStorage.getItem('userRole')
   const [images, setImages] = useState<Stage2Image[]>([])
   const [loading, setLoading] = useState(true)
   const [doctorName, setDoctorName] = useState('')
@@ -29,6 +30,11 @@ function GalleryView() {
   // Modal state
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Stage 2 is temporarily disabled for evaluator-facing navigation.
+  if (userRole === 'evaluator' && doctorId) {
+    return <Navigate to={`/select-stage/${doctorId}`} replace />
+  }
 
   useEffect(() => {
     async function fetchData() {

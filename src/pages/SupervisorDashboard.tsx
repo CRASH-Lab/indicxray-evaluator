@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { 
   Card, 
   CardContent, 
@@ -30,8 +30,6 @@ import {
 } from "@/components/ui/accordion"
 import { 
   getAllEvaluators, 
-  getAllEvaluations, 
-  getAllCases, 
   getMetrics,
   getEvaluatorCases,
   adminGetAssignments,
@@ -55,8 +53,18 @@ interface Evaluation {
   model_id: string;
   model_name: string;
   metric_id: string;
+  metric_name?: string;
   score: number;
   created_at: string;
+}
+
+interface PaginatedEvaluationsResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  page: number;
+  page_size: number;
+  results: Evaluation[];
 }
 
 interface Case {
@@ -73,15 +81,30 @@ interface Metric {
 function SupervisorDashboard() {
   const { supervisorId } = useParams()
   const navigate = useNavigate()
-  
-  const [activeTab, setActiveTab] = useState('evaluators')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const initialTab = searchParams.get('tab') || 'evaluations'
+  const initialPage = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1)
+  const initialEvaluator = searchParams.get('evaluator')
+
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [evaluators, setEvaluators] = useState<Evaluator[]>([])
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [cases, setCases] = useState<Case[]>([])
   const [evaluatorCases, setEvaluatorCases] = useState<any[]>([])
   const [metrics, setMetrics] = useState<Metric[]>([])
   const [stage2Stats, setStage2Stats] = useState<any>(null)
-  const [selectedEvaluator, setSelectedEvaluator] = useState<string | null>(null)
+  const [selectedEvaluator, setSelectedEvaluator] = useState<string | null>(initialEvaluator)
+  const [evaluationsPage, setEvaluationsPage] = useState(initialPage)
+  const [evaluationsPageSize] = useState(100)
+  const [evaluationsPagination, setEvaluationsPagination] = useState<PaginatedEvaluationsResponse>({
+    count: 0,
+    next: null,
+    previous: null,
+    page: 1,
+    page_size: 100,
+    results: [],
+  })
   const [loading, setLoading] = useState({
     evaluators: true,
     evaluations: true,
@@ -91,6 +114,51 @@ function SupervisorDashboard() {
     stage2: true
   })
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') || 'evaluations'
+    const pageFromUrl = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1)
+    const evaluatorFromUrl = searchParams.get('evaluator')
+
+    if (tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl)
+    }
+
+    if (pageFromUrl !== evaluationsPage) {
+      setEvaluationsPage(pageFromUrl)
+    }
+
+    if (evaluatorFromUrl !== selectedEvaluator) {
+      setSelectedEvaluator(evaluatorFromUrl)
+    }
+  }, [searchParams])
+
+  const updateDashboardUrl = (nextState: {
+    tab?: string;
+    page?: number;
+    evaluator?: string | null;
+  }) => {
+    const nextTab = nextState.tab ?? activeTab
+    const nextPage = nextState.page ?? evaluationsPage
+    const nextEvaluator = nextState.evaluator !== undefined ? nextState.evaluator : selectedEvaluator
+    const params = new URLSearchParams(searchParams)
+
+    params.set('tab', nextTab)
+
+    if (nextTab === 'evaluations') {
+      params.set('page', String(nextPage))
+      if (nextEvaluator) {
+        params.set('evaluator', nextEvaluator)
+      } else {
+        params.delete('evaluator')
+      }
+    } else {
+      params.delete('page')
+      params.delete('evaluator')
+    }
+
+    setSearchParams(params, { replace: true })
+  }
 
   useEffect(() => {
     async function fetchData() {
@@ -113,7 +181,7 @@ function SupervisorDashboard() {
         
         // Map assignments to "Cases" format
         const mappedCases = assignmentsData.map((a: any) => ({
-            id: a.id, // Assignment ID
+            id: a.evaluation_set.study_id,
             image_id: a.evaluation_set.study_id,
         }));
         setCases(mappedCases)
@@ -126,12 +194,6 @@ function SupervisorDashboard() {
         setMetrics(metricsData)
         setLoading(prev => ({ ...prev, metrics: false }))
         
-        // Fetch all evaluations
-        setLoading(prev => ({ ...prev, evaluations: true }))
-        const evaluationsData = await adminGetEvaluations()
-        setEvaluations(evaluationsData)
-        setLoading(prev => ({ ...prev, evaluations: false }))
-
       } catch (err) {
         console.error('Error fetching supervisor data:', err)
         setError('Failed to load data. Please check your connection and try again.')
@@ -148,6 +210,36 @@ function SupervisorDashboard() {
     
     fetchData()
   }, [])
+
+  useEffect(() => {
+    async function fetchEvaluations() {
+      try {
+        setLoading(prev => ({ ...prev, evaluations: true }))
+        const evaluationsData = await adminGetEvaluations({
+          page: evaluationsPage,
+          pageSize: evaluationsPageSize,
+          evaluatorId: selectedEvaluator,
+        })
+
+        setEvaluations(evaluationsData.results || [])
+        setEvaluationsPagination({
+          count: evaluationsData.count || 0,
+          next: evaluationsData.next || null,
+          previous: evaluationsData.previous || null,
+          page: evaluationsData.page || evaluationsPage,
+          page_size: evaluationsData.page_size || evaluationsPageSize,
+          results: evaluationsData.results || [],
+        })
+      } catch (err) {
+        console.error('Error fetching evaluations:', err)
+        setError('Failed to load evaluations. Please check your connection and try again.')
+      } finally {
+        setLoading(prev => ({ ...prev, evaluations: false }))
+      }
+    }
+
+    fetchEvaluations()
+  }, [evaluationsPage, evaluationsPageSize, selectedEvaluator])
   
   // Fetch evaluator-specific cases when an evaluator is selected
   useEffect(() => {
@@ -169,13 +261,8 @@ function SupervisorDashboard() {
     }
   }, [selectedEvaluator])
   
-  // Filter evaluations by selected evaluator
-  const filteredEvaluations = selectedEvaluator
-    ? evaluations.filter(evaluation => evaluation.evaluator_id === selectedEvaluator)
-    : evaluations
-  
   // Group evaluations by case
-  const evaluationsByCase: Record<string, Evaluation[]> = filteredEvaluations.reduce((acc, evaluation) => {
+  const evaluationsByCase: Record<string, Evaluation[]> = evaluations.reduce((acc, evaluation) => {
     const caseId = evaluation.case_id
     if (!acc[caseId]) {
       acc[caseId] = []
@@ -236,20 +323,23 @@ function SupervisorDashboard() {
   }
 
   // Get metric name by ID
-  const getMetricName = (metricId: string): string => {
+  const getMetricName = (metricId: string, fallbackName?: string): string => {
     const metric = metrics.find(m => m.id === metricId);
     if (metric) {
       return metric.name;
     }
-    
+
+    if (fallbackName) {
+      return fallbackName;
+    }
+
     console.warn(`Metric not found for ID: ${metricId}`);
     return `Metric ${metricId.slice(0, 8)}`;
   }
 
   // Get color based on score value
   const getScoreColor = (score: number): string => {
-    if (score >= 8) return "text-green-500 font-bold"
-    if (score >= 5) return "text-yellow-500 font-bold"
+    if (score >= 1) return "text-green-500 font-bold"
     return "text-red-500 font-bold"
   }
 
@@ -269,10 +359,46 @@ function SupervisorDashboard() {
     navigate('/supervisor')
   }
 
+  const handleTabChange = (nextTab: string) => {
+    setActiveTab(nextTab)
+    updateDashboardUrl({ tab: nextTab })
+  }
+
   const handleSelectEvaluator = (evaluatorId: string) => {
+    setEvaluationsPage(1)
     setSelectedEvaluator(evaluatorId)
     setActiveTab('evaluations')
+    updateDashboardUrl({
+      tab: 'evaluations',
+      page: 1,
+      evaluator: evaluatorId,
+    })
   }
+
+  const clearEvaluatorFilter = () => {
+    setEvaluationsPage(1)
+    setSelectedEvaluator(null)
+    updateDashboardUrl({
+      tab: 'evaluations',
+      page: 1,
+      evaluator: null,
+    })
+  }
+
+  const goToPreviousPage = () => {
+    const nextPage = Math.max(1, evaluationsPage - 1)
+    setEvaluationsPage(nextPage)
+    updateDashboardUrl({ tab: 'evaluations', page: nextPage })
+  }
+
+  const goToNextPage = () => {
+    const nextPage = evaluationsPage + 1
+    setEvaluationsPage(nextPage)
+    updateDashboardUrl({ tab: 'evaluations', page: nextPage })
+  }
+
+  const totalPages = Math.max(1, Math.ceil(evaluationsPagination.count / evaluationsPagination.page_size))
+  const stage2AssignedCount = stage2Stats?.assigned_images_per_evaluator ?? stage2Stats?.total_images ?? 0
 
   return (
     <div className="container mx-auto py-8">
@@ -293,7 +419,7 @@ function SupervisorDashboard() {
         </CardHeader>
       </Card>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="evaluators">Evaluators</TabsTrigger>
           <TabsTrigger value="evaluations">Stage 1 Evaluations</TabsTrigger>
@@ -364,7 +490,7 @@ function SupervisorDashboard() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => setSelectedEvaluator(null)}
+                    onClick={clearEvaluatorFilter}
                   >
                     Show All Evaluations
                   </Button>
@@ -428,7 +554,7 @@ function SupervisorDashboard() {
                                         <TableBody>
                                           {modelEvals.map(evaluation => (
                                             <TableRow key={evaluation.id}>
-                                              <TableCell>{getMetricName(evaluation.metric_id)}</TableCell>
+                                              <TableCell>{getMetricName(evaluation.metric_id, evaluation.metric_name)}</TableCell>
                                               <TableCell className={getScoreColor(evaluation.score)}>
                                                 {evaluation.score}
                                               </TableCell>
@@ -464,19 +590,19 @@ function SupervisorDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredEvaluations.length === 0 ? (
+                    {evaluations.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center">No evaluations found</TableCell>
                       </TableRow>
                     ) : (
-                      filteredEvaluations.map(evaluation => {
+                      evaluations.map(evaluation => {
                         const caseDetails = getCaseDetails(evaluation.case_id);
                         return (
                           <TableRow key={evaluation.id}>
                             <TableCell>{caseDetails.image_id}</TableCell>
                             <TableCell>{getEvaluatorName(evaluation.evaluator_id)}</TableCell>
                             <TableCell>{evaluation.model_name || 'Unknown'}</TableCell>
-                            <TableCell>{getMetricName(evaluation.metric_id)}</TableCell>
+                            <TableCell>{getMetricName(evaluation.metric_id, evaluation.metric_name)}</TableCell>
                             <TableCell className={getScoreColor(evaluation.score)}>
                               {evaluation.score}
                             </TableCell>
@@ -487,6 +613,32 @@ function SupervisorDashboard() {
                     )}
                   </TableBody>
                 </Table>
+              )}
+
+              {!loading.evaluations && (
+                <div className="flex items-center justify-between mt-4 gap-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing page {evaluationsPagination.page} of {totalPages} ({evaluationsPagination.count} total evaluations)
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToPreviousPage}
+                      disabled={!evaluationsPagination.previous}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToNextPage}
+                      disabled={!evaluationsPagination.next}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -499,7 +651,7 @@ function SupervisorDashboard() {
                  <CardHeader>
                      <CardTitle>Stage 2: AI Detection Progress</CardTitle>
                      <CardDescription>
-                        Tracking evaluator progress on {stage2Stats?.total_images || 0} Stage 2 images.
+                        Tracking evaluator progress on {stage2AssignedCount} assigned Stage 2 images per evaluator.
                      </CardDescription>
                  </CardHeader>
                  <CardContent>
