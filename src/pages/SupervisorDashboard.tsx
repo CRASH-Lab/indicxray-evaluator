@@ -28,12 +28,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import { 
-  getAllEvaluators, 
+import {
+  getAllEvaluators,
   getMetrics,
-  getEvaluatorCases,
   adminGetAssignments,
   adminGetEvaluations,
+  adminGetAllEvaluatorEvaluations,
   adminGetStage2Stats
 } from '@/services'
 import { Loader2 } from 'lucide-react'
@@ -91,10 +91,11 @@ function SupervisorDashboard() {
   const [evaluators, setEvaluators] = useState<Evaluator[]>([])
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [cases, setCases] = useState<Case[]>([])
-  const [evaluatorCases, setEvaluatorCases] = useState<any[]>([])
+  const [evaluatorEvaluations, setEvaluatorEvaluations] = useState<(Evaluation & { is_cross_assigned: boolean })[]>([])
   const [metrics, setMetrics] = useState<Metric[]>([])
   const [stage2Stats, setStage2Stats] = useState<any>(null)
   const [selectedEvaluator, setSelectedEvaluator] = useState<string | null>(initialEvaluator)
+  const [caseTab, setCaseTab] = useState<'original' | 'cross'>('original')
   const [evaluationsPage, setEvaluationsPage] = useState(initialPage)
   const [evaluationsPageSize] = useState(100)
   const [evaluationsPagination, setEvaluationsPagination] = useState<PaginatedEvaluationsResponse>({
@@ -110,7 +111,7 @@ function SupervisorDashboard() {
     evaluations: true,
     cases: true,
     metrics: true,
-    evaluatorCases: false,
+    evaluatorEvaluations: false,
     stage2: true
   })
   const [error, setError] = useState('')
@@ -202,7 +203,7 @@ function SupervisorDashboard() {
           evaluations: false,
           cases: false,
           metrics: false,
-          evaluatorCases: false,
+          evaluatorEvaluations: false,
           stage2: false
         })
       }
@@ -211,14 +212,16 @@ function SupervisorDashboard() {
     fetchData()
   }, [])
 
+  // Paginated evaluations — only used for the "all evaluations" flat table (no evaluator selected)
   useEffect(() => {
+    if (selectedEvaluator) return
+
     async function fetchEvaluations() {
       try {
         setLoading(prev => ({ ...prev, evaluations: true }))
         const evaluationsData = await adminGetEvaluations({
           page: evaluationsPage,
           pageSize: evaluationsPageSize,
-          evaluatorId: selectedEvaluator,
         })
 
         setEvaluations(evaluationsData.results || [])
@@ -240,36 +243,29 @@ function SupervisorDashboard() {
 
     fetchEvaluations()
   }, [evaluationsPage, evaluationsPageSize, selectedEvaluator])
-  
-  // Fetch evaluator-specific cases when an evaluator is selected
+
+  // Fetch all evaluations for a specific evaluator (no pagination) when one is selected
   useEffect(() => {
-    if (selectedEvaluator) {
-      async function fetchEvaluatorCases() {
-        try {
-          setLoading(prev => ({ ...prev, evaluatorCases: true }))
-          const casesData = await getEvaluatorCases(selectedEvaluator)
-          setEvaluatorCases(casesData)
-          setLoading(prev => ({ ...prev, evaluatorCases: false }))
-        } catch (err) {
-          console.error('Error fetching evaluator cases:', err)
-          setLoading(prev => ({ ...prev, evaluatorCases: false }))
-          setError('Failed to load evaluator cases.')
-        }
+    if (!selectedEvaluator) {
+      setEvaluatorEvaluations([])
+      return
+    }
+
+    async function fetchEvaluatorEvaluations() {
+      try {
+        setLoading(prev => ({ ...prev, evaluatorEvaluations: true }))
+        const data = await adminGetAllEvaluatorEvaluations(selectedEvaluator!)
+        setEvaluatorEvaluations(data as (Evaluation & { is_cross_assigned: boolean })[])
+      } catch (err) {
+        console.error('Error fetching evaluator evaluations:', err)
+        setError('Failed to load evaluator evaluations.')
+      } finally {
+        setLoading(prev => ({ ...prev, evaluatorEvaluations: false }))
       }
-      
-      fetchEvaluatorCases()
     }
+
+    fetchEvaluatorEvaluations()
   }, [selectedEvaluator])
-  
-  // Group evaluations by case
-  const evaluationsByCase: Record<string, Evaluation[]> = evaluations.reduce((acc, evaluation) => {
-    const caseId = evaluation.case_id
-    if (!acc[caseId]) {
-      acc[caseId] = []
-    }
-    acc[caseId].push(evaluation)
-    return acc
-  }, {} as Record<string, Evaluation[]>)
   
   // Add a utility method to load case details if needed
   const fetchCaseDetailIfNeeded = async (caseId: string) => {
@@ -498,50 +494,60 @@ function SupervisorDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {loading.evaluations || loading.metrics || loading.evaluatorCases ? (
+              {(selectedEvaluator ? loading.evaluatorEvaluations : loading.evaluations) || loading.metrics ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : selectedEvaluator ? (
-                // Display evaluations grouped by case for the selected evaluator
-                <div className="space-y-6">
-                  {Object.keys(evaluationsByCase).length === 0 ? (
-                    <div className="text-center py-6">
-                      No evaluations found for this evaluator
-                    </div>
-                  ) : (
-                    <Accordion type="single" collapsible className="w-full">
-                      {Object.entries(evaluationsByCase).map(([caseId, caseEvaluations]) => {
-                        const caseDetails = getCaseDetails(caseId);
-                        // Group evaluations by model
-                        const modelGroups = caseEvaluations.reduce((acc, evaluation) => {
-                          const modelId = evaluation.model_id;
-                          if (!acc[modelId]) {
-                            acc[modelId] = [];
-                          }
-                          acc[modelId].push(evaluation);
-                          return acc;
-                        }, {} as Record<string, Evaluation[]>);
-                        
-                        return (
-                          <AccordionItem key={caseId} value={caseId}>
-                            <AccordionTrigger className="hover:bg-gray-50 px-4 rounded">
-                              <div className="flex items-center justify-between w-full">
-                                <span>Case: {caseDetails.image_id}</span>
-                                <span className="text-sm text-gray-500">
-                                  {caseEvaluations.length} evaluations
-                                </span>
-                              </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                              <div className="pt-2 pb-4 px-4">
-                                {Object.entries(modelGroups).map(([modelId, modelEvals]) => {
-                                  const modelName = modelEvals[0]?.model_name || 'Unknown Model';
-                                  
-                                  return (
+                // Display evaluations split into Original / Cross-Assigned tabs
+                (() => {
+                  const batch1Evaluations: Record<string, Evaluation[]> = {}
+                  const batch2Evaluations: Record<string, Evaluation[]> = {}
+
+                  for (const ev of evaluatorEvaluations) {
+                    const target = ev.is_cross_assigned ? batch2Evaluations : batch1Evaluations
+                    if (!target[ev.case_id]) target[ev.case_id] = []
+                    target[ev.case_id].push(ev)
+                  }
+
+                  if (evaluatorEvaluations.length === 0) {
+                    return (
+                      <div className="text-center py-6 text-muted-foreground">
+                        No evaluations found for this evaluator
+                      </div>
+                    )
+                  }
+
+                  const renderBatchAccordion = (batchEvaluations: Record<string, Evaluation[]>, emptyMsg: string) => {
+                    if (Object.keys(batchEvaluations).length === 0) {
+                      return <p className="text-sm text-muted-foreground py-4 px-1">{emptyMsg}</p>
+                    }
+                    return (
+                      <Accordion type="single" collapsible className="w-full">
+                        {Object.entries(batchEvaluations).map(([caseId, caseEvaluations]) => {
+                          const caseDetails = getCaseDetails(caseId)
+                          const modelGroups = caseEvaluations.reduce((acc, evaluation) => {
+                            if (!acc[evaluation.model_id]) acc[evaluation.model_id] = []
+                            acc[evaluation.model_id].push(evaluation)
+                            return acc
+                          }, {} as Record<string, Evaluation[]>)
+
+                          return (
+                            <AccordionItem key={caseId} value={caseId}>
+                              <AccordionTrigger className="hover:bg-gray-50 px-4 rounded">
+                                <div className="flex items-center justify-between w-full">
+                                  <span>Case: {caseDetails.image_id}</span>
+                                  <span className="text-sm text-gray-500">
+                                    {caseEvaluations.length} evaluations
+                                  </span>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="pt-2 pb-4 px-4">
+                                  {Object.entries(modelGroups).map(([modelId, modelEvals]) => (
                                     <div key={modelId} className="mb-6 border rounded-lg p-4">
                                       <h4 className="font-medium text-lg mb-3">
-                                        Model: {modelName}
+                                        Model: {modelEvals[0]?.model_name || 'Unknown Model'}
                                       </h4>
                                       <Table>
                                         <TableHeader>
@@ -558,24 +564,41 @@ function SupervisorDashboard() {
                                               <TableCell className={getScoreColor(evaluation.score)}>
                                                 {evaluation.score}
                                               </TableCell>
-                                              <TableCell>
-                                                {formatDate(evaluation.created_at)}
-                                              </TableCell>
+                                              <TableCell>{formatDate(evaluation.created_at)}</TableCell>
                                             </TableRow>
                                           ))}
                                         </TableBody>
                                       </Table>
                                     </div>
-                                  );
-                                })}
-                              </div>
-                            </AccordionContent>
-                          </AccordionItem>
-                        );
-                      })}
-                    </Accordion>
-                  )}
-                </div>
+                                  ))}
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          )
+                        })}
+                      </Accordion>
+                    )
+                  }
+
+                  return (
+                    <Tabs value={caseTab} onValueChange={(v) => setCaseTab(v as 'original' | 'cross')}>
+                      <TabsList className="mb-4">
+                        <TabsTrigger value="original">
+                          Original Cases ({Object.keys(batch1Evaluations).length})
+                        </TabsTrigger>
+                        <TabsTrigger value="cross">
+                          Cross-Assigned ({Object.keys(batch2Evaluations).length})
+                        </TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="original">
+                        {renderBatchAccordion(batch1Evaluations, 'No original cases found.')}
+                      </TabsContent>
+                      <TabsContent value="cross">
+                        {renderBatchAccordion(batch2Evaluations, 'No cross-assigned cases found.')}
+                      </TabsContent>
+                    </Tabs>
+                  )
+                })()
               ) : (
                 // Display all evaluations when no evaluator is selected
                 <Table>

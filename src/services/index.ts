@@ -465,6 +465,7 @@ async function getEvaluatorCases(evaluatorId: string) {
           last_updated: assignment.last_activity_at || assignment.assigned_at,
           evaluation_set_id: assignment.evaluation_set.id,
           study_id: assignment.evaluation_set.study_id,
+          is_cross_assigned: assignment.is_cross_assigned ?? false,
         });
       });
     }
@@ -543,6 +544,27 @@ async function adminGetEvaluations(params?: {
   }
 }
 
+async function adminGetAllEvaluatorEvaluations(evaluatorId: string) {
+  try {
+    const response = await instance.get(`admin/evaluator/${evaluatorId}/evaluations/`);
+    return response.data.results as Array<{
+      id: string;
+      score: number;
+      metric_id: string;
+      metric_name: string;
+      evaluator_id: string;
+      case_id: string;
+      is_cross_assigned: boolean;
+      model_id: string;
+      model_name: string;
+      created_at: string;
+    }>;
+  } catch (error) {
+    console.error("Error fetching all evaluations for evaluator:", error);
+    return [];
+  }
+}
+
 // Stage 2 Functions
 async function getStage2Images(doctorId?: string) {
   try {
@@ -617,6 +639,7 @@ export {
   adminDeleteUser,
   adminGetAssignments,
   adminGetEvaluations,
+  adminGetAllEvaluatorEvaluations,
   getStage2Images,
   saveStage2Evaluation,
   adminGetStage2Stats,
