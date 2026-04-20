@@ -607,6 +607,16 @@ async function adminGetStage2Stats() {
       };
   }
 }
+
+async function adminRunReliabilityReport() {
+  try {
+    const response = await instance.post("admin/reports/reliability/");
+    return response.data;
+  } catch (error) {
+    console.error("Error running reliability report:", error);
+    throw error;
+  }
+}
 const refreshImageUrl = async (type: 'image' | 'model' | 'stage2' | 's3_record', id: string) => {
   try {
     const response = await instance.post('evaluations/refresh-url/', { type, id });
@@ -643,5 +653,6 @@ export {
   getStage2Images,
   saveStage2Evaluation,
   adminGetStage2Stats,
+  adminRunReliabilityReport,
   refreshImageUrl
 };

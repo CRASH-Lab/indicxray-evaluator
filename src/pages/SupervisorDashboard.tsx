@@ -406,6 +406,9 @@ function SupervisorDashboard() {
               <CardDescription>Review evaluator performance and case evaluations</CardDescription>
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigate('/supervisor/analysis')}>
+                Analysis
+              </Button>
               <Button variant="default" onClick={() => navigate('/supervisor/users')}>
                 Manage Users
               </Button>

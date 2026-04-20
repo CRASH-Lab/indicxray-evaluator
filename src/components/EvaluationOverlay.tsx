@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { ModelOutput, Metric } from '@/types'
 import { X } from 'lucide-react'
@@ -9,6 +9,7 @@ import { refreshImageUrl } from '@/services'
 interface EvaluationOverlayProps {
   model: ModelOutput | null
   metrics: Metric[]
+  structuredPromptText?: string
   groundTruthImage?: string
   groundTruthImageId?: string
   onClose: () => void
@@ -16,32 +17,33 @@ interface EvaluationOverlayProps {
   existingScores?: Record<string, number>
 }
 
-const METRIC_GUIDELINES: Record<string, { 1: string; 0: string }> = {
+const METRIC_GUIDELINES: Record<string, { 1: ReactNode; 0: ReactNode }> = {
   'Anatomical Validity': {
-    1: 'Anatomically plausible thoracic structures without distortion.',
-    0: 'Implausible, distorted, or missing major anatomical structures.'
+    1: 'Only anatomically plausible thoracic structures without distortion.',
+    0: 'One or more implausible, distorted, or missing major anatomical structures.'
   },
   'Pathology Presence': {
-    1: 'Prompted pathology is clearly visible.',
-    0: 'Pathology is absent, unclear, or different from the prompt.'
-  },
-  'Location Concordance': {
-    1: 'Pathology is in the correct anatomical location and laterality.',
-    0: 'Wrong location, or side.'
+    1: 'The prompted pathology (finding) is clearly visible.',
+    0: 'Pathology (finding) is absent or different from the prompt.'
   },
   'Internal Consistency': {
-    1: 'Imaging features are radiologically plausible, including the presence of indirect signs.',
-    0: 'Conflicting or physiologically impossible features (e.g., consolidation without loss of silhouette sign).'
+    1: 'Imaging findings are consistent with the prompted pathology (finding) and follow natural radiological patterns.',
+    0: 'Imaging findings show unrealistic features that do not naturally occur'
+  },
+  'Attribute Concordance': {
+    1: 'Attribute/ location and side is correctly depicted.',
+    0: 'Wrong attribute, location, or side.'
   },
   'Similarity Index': {
-    1: 'Reference anatomy preserved except for the intended modification.',
-    0: 'Unintended changes or hallucinated findings.'
+    1: <>The background image looks <u>same</u> as the reference image.</>,
+    0: <>The background image looks <u>different</u> from the reference image.</>
   }
 };
 
 export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
   model,
   metrics,
+  structuredPromptText,
   groundTruthImage,
   groundTruthImageId,
   onClose,
@@ -190,12 +192,92 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
             <DialogTitle className="text-xl font-semibold text-white">Model {model.modelName} Evaluation</DialogTitle>
             <DialogDescription className="text-sm text-white/80">ID: {model.id.substring(0, 8)}...</DialogDescription>
           </div>
-          <button
-            onClick={onClose}
-            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
-          >
-            <X size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="relative group">
+              <button
+                type="button"
+                className="text-white/90 hover:bg-white/20 rounded-full w-9 h-9 flex items-center justify-center transition-colors border border-white/20"
+                aria-label="Show evaluation instructions"
+              >
+                ?
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-[34rem] max-w-[80vw] max-h-[70vh] overflow-y-auto rounded-lg border border-medical-dark-gray/40 bg-medical-darkest-gray shadow-2xl p-4 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                <h3 className="text-sm font-medium text-medical-gray uppercase mb-3">
+                  How To Evaluate Properly
+                </h3>
+                <div className="space-y-4 text-xs text-medical-gray/90 leading-relaxed">
+                  <div>
+                    <p className="text-foreground font-semibold mb-1">1) Anatomical Validity</p>
+                    <p className="mb-1">Evaluate ONLY the generated image (ignore reference image and pathology region).</p>
+                    <p className="mb-1 text-foreground/90">Look for:</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>Normal lung fields, ribs, clavicles, scapulae</li>
+                      <li>Normal cardiomediastinal silhouette, shape and position</li>
+                      <li>Normal diaphragm contours and bowel shadows</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="text-foreground font-semibold mb-1">2) Pathology Presence</p>
+                    <p className="mb-1">
+                      Evaluate only whether a pathology (finding) is present in the generated image. Do not assess whether the pathology (finding) is radiologically correct.
+                    </p>
+                    <p className="mb-1">Revisiting prompt structure: Right moderate pleural effusion = Right moderate (Attribute) + Pleural effusion (Finding).</p>
+                    <p className="mb-1 text-foreground/90">Focus ONLY on:</p>
+                    <ul className="list-disc pl-5 space-y-1 mb-1">
+                      <li>Presence of abnormality</li>
+                    </ul>
+                    <p className="mb-1 text-foreground/90">Ignore:</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>Whether it is radiologically correct</li>
+                      <li>Whether secondary signs are present</li>
+                      <li>Whether the diagnosis is accurate</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="text-foreground font-semibold mb-1">3) Internal Consistency</p>
+                    <p className="mb-1">Evaluate whether the pathology (finding) is radiologically correct.</p>
+                    <p className="mb-1 text-foreground/90">Focus on:</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>Radiological patterns fit the prompted pathology (finding)</li>
+                      <li>Presence or absence of expected secondary signs</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="text-foreground font-semibold mb-1">4) Attribute concordance</p>
+                    <p>
+                      Evaluate whether attribute, location, and side of the prompted pathology (finding) is accurate. Revisiting prompt
+                      structure: Right moderate pleural effusion = Right moderate (Attribute) + Pleural effusion (Finding).
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-foreground font-semibold mb-1">5) Similarity index</p>
+                    <p className="mb-1">
+                      Evaluate only the background features (ignoring the generated pathology) of the generated image compared to the reference image.
+                    </p>
+                    <p className="mb-1 text-foreground/90">Carefully look for:</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>Same radiographic marker</li>
+                      <li>Same breast shadow</li>
+                      <li>Same bowel or stomach gas</li>
+                      <li>Presence of additional hallucinated artefacts</li>
+                      <li>Increased or decreased graininess</li>
+                      <li>Any signs that the background chest X-ray is not from the same patient</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
 
@@ -351,12 +433,14 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
           {/* Right Side - Model Response & Evaluation Metrics */}
           <div className="w-1/3 flex flex-col overflow-y-auto">
             <div className="p-6 space-y-6">
-              {/* Model Response */}
+              {/* Structured Prompt */}
               <div className="bg-medical-dark-gray/30 rounded-lg border border-medical-dark-gray/30 p-4">
                 <h3 className="text-sm font-medium text-medical-gray uppercase mb-2">
-                  Model Response:
+                  Structured Prompt:
                 </h3>
-                <p className="text-sm text-foreground whitespace-pre-wrap">{model.response}</p>
+                <p className="text-sm text-foreground whitespace-pre-wrap">
+                  {structuredPromptText || 'No structured prompt available'}
+                </p>
               </div>
 
               {/* Evaluation Metrics */}
@@ -392,9 +476,6 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
                               "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
                               scores[metric.id] === 1 ? "bg-green-500 text-white" : "bg-medical-gray text-medical-darkest-gray"
                             )}>1</span>
-                            <span className={cn("font-medium text-sm", scores[metric.id] === 1 ? "text-green-500" : "text-foreground")}>
-                              Yes / Good
-                            </span>
                           </div>
                           <p className="text-xs text-medical-gray/80 leading-relaxed">
                             {guidelines[1]}
@@ -416,9 +497,6 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
                               "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
                               scores[metric.id] === 0 ? "bg-red-500 text-white" : "bg-medical-gray text-medical-darkest-gray"
                             )}>0</span>
-                            <span className={cn("font-medium text-sm", scores[metric.id] === 0 ? "text-red-500" : "text-foreground")}>
-                              No / Bad
-                            </span>
                           </div>
                           <p className="text-xs text-medical-gray/80 leading-relaxed">
                             {guidelines[0]}

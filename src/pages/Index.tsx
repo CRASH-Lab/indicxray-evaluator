@@ -98,6 +98,10 @@ const Index = (props: Props) => {
   }
 
   const currentImage = caseRecord.images[activeImageIndex]
+  const structuredPromptText =
+    currentImage?.groundTruth?.findings?.trim() ||
+    currentImage?.groundTruth?.impressions?.trim() ||
+    ''
 
   const handleModelClick = (model: ModelOutput) => {
     setActiveModel(model)
@@ -400,6 +404,7 @@ const Index = (props: Props) => {
       <EvaluationOverlay
         model={activeModel}
         metrics={metrics}
+        structuredPromptText={structuredPromptText}
         groundTruthImage={currentImage?.imageUrl}
         groundTruthImageId={currentImage?.internalId || currentImage?.imageId}
         onClose={() => setActiveModel(null)}
