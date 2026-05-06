@@ -351,11 +351,8 @@ function SupervisorDashboard() {
     }
   }
 
-  function handleLogout() {
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('userId')
-    localStorage.removeItem('userRole')
-    navigate('/supervisor', { replace: true })
+  function goBack() {
+    navigate('/supervisor')
   }
 
   const handleTabChange = (nextTab: string) => {
@@ -415,7 +412,7 @@ function SupervisorDashboard() {
               <Button variant="default" onClick={() => navigate('/supervisor/users')}>
                 Manage Users
               </Button>
-              <Button variant="outline" onClick={handleLogout}>Log out</Button>
+              <Button variant="outline" onClick={goBack}>Back to Login</Button>
             </div>
           </div>
         </CardHeader>

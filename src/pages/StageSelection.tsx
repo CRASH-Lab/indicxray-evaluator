@@ -12,7 +12,7 @@ function StageSelection() {
       localStorage.removeItem('authToken')
       localStorage.removeItem('userId')
       localStorage.removeItem('userRole')
-      navigate('/', { replace: true })
+      navigate('/')
   }
 
   return (
