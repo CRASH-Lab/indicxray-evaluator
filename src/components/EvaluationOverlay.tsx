@@ -17,28 +17,102 @@ interface EvaluationOverlayProps {
   existingScores?: Record<string, number>
 }
 
+const METRIC_KEY = (name: string) => name.trim().toLowerCase()
+
 const METRIC_GUIDELINES: Record<string, { 1: ReactNode; 0: ReactNode }> = {
-  'Anatomical Validity': {
+  [METRIC_KEY('Anatomical Validity')]: {
     1: 'Only anatomically plausible thoracic structures without distortion.',
     0: 'One or more implausible, distorted, or missing major anatomical structures.'
   },
-  'Pathology Presence': {
+  [METRIC_KEY('Pathology Presence')]: {
     1: 'The prompted pathology (finding) is clearly visible.',
     0: 'Pathology (finding) is absent or different from the prompt.'
   },
-  'Internal Consistency': {
+  [METRIC_KEY('Internal Consistency')]: {
     1: 'Imaging findings are consistent with the prompted pathology (finding) and follow natural radiological patterns.',
     0: 'Imaging findings show unrealistic features that do not naturally occur'
   },
-  'Attribute Concordance': {
+  [METRIC_KEY('Attribute Concordance')]: {
     1: 'Attribute/ location and side is correctly depicted.',
     0: 'Wrong attribute, location, or side.'
   },
-  'Similarity Index': {
+  [METRIC_KEY('Similarity Index')]: {
     1: <>The background image looks <u>same</u> as the reference image.</>,
     0: <>The background image looks <u>different</u> from the reference image.</>
   }
 };
+
+const METRIC_INSTRUCTIONS: Record<string, ReactNode> = {
+  [METRIC_KEY('Anatomical Validity')]: (
+    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
+      <p className="text-foreground font-semibold">1) Anatomical Validity</p>
+      <p>Evaluate ONLY the generated image (ignore reference image and pathology region).</p>
+      <p className="text-foreground/90">Look for:</p>
+      <ul className="list-disc pl-5 space-y-1">
+        <li>Normal lung fields, ribs, clavicles, scapulae</li>
+        <li>Normal cardiomediastinal silhouette, shape and position</li>
+        <li>Normal diaphragm contours and bowel shadows</li>
+      </ul>
+    </div>
+  ),
+  [METRIC_KEY('Pathology Presence')]: (
+    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
+      <p className="text-foreground font-semibold">2) Pathology Presence</p>
+      <p>
+        Evaluate only whether a pathology (finding) is present in the generated image. Do not assess whether the pathology (finding) is radiologically correct.
+      </p>
+      <p>
+        Revisiting prompt structure: Right moderate pleural effusion = Right moderate (Attribute) + Pleural effusion (Finding).
+      </p>
+      <p className="text-foreground/90">Focus ONLY on:</p>
+      <ul className="list-disc pl-5 space-y-1 mb-1">
+        <li>Presence of abnormality</li>
+      </ul>
+      <p className="text-foreground/90">Ignore:</p>
+      <ul className="list-disc pl-5 space-y-1">
+        <li>Whether it is radiologically correct</li>
+        <li>Whether secondary signs are present</li>
+        <li>Whether the diagnosis is accurate</li>
+      </ul>
+    </div>
+  ),
+  [METRIC_KEY('Internal Consistency')]: (
+    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
+      <p className="text-foreground font-semibold">3) Internal Consistency</p>
+      <p>Evaluate whether the pathology (finding) is radiologically correct.</p>
+      <p className="text-foreground/90">Focus on:</p>
+      <ul className="list-disc pl-5 space-y-1">
+        <li>Radiological patterns fit the prompted pathology (finding)</li>
+        <li>Presence or absence of expected secondary signs</li>
+      </ul>
+    </div>
+  ),
+  [METRIC_KEY('Attribute Concordance')]: (
+    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
+      <p className="text-foreground font-semibold">4) Attribute concordance</p>
+      <p>
+        Evaluate whether attribute, location, and side of the prompted pathology (finding) is accurate. Revisiting prompt structure: Right moderate pleural effusion = Right moderate (Attribute) + Pleural effusion (Finding).
+      </p>
+    </div>
+  ),
+  [METRIC_KEY('Similarity Index')]: (
+    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
+      <p className="text-foreground font-semibold">5) Similarity index</p>
+      <p>
+        Evaluate only the background features (ignoring the generated pathology) of the generated image compared to the reference image.
+      </p>
+      <p className="text-foreground/90">Carefully look for:</p>
+      <ul className="list-disc pl-5 space-y-1">
+        <li>Same radiographic marker</li>
+        <li>Same breast shadow</li>
+        <li>Same bowel or stomach gas</li>
+        <li>Presence of additional hallucinated artefacts</li>
+        <li>Increased or decreased graininess</li>
+        <li>Any signs that the background chest X-ray is not from the same patient</li>
+      </ul>
+    </div>
+  ),
+}
 
 export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
   model,
@@ -70,7 +144,7 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
     origX: number
     origY: number
   } | null>(null)
-  const [showInstructions, setShowInstructions] = useState(false)
+  const [activeInstructionMetric, setActiveInstructionMetric] = useState<string | null>(null)
 
   // Reset/Update scores when model or existingScores change
   React.useEffect(() => {
@@ -370,98 +444,49 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                    <h3 className="text-lg font-semibold text-foreground">Evaluation Metrics</h3>
-                   <button
-                     onClick={() => setShowInstructions(!showInstructions)}
-                     className="px-3 py-1 text-sm bg-medical-blue hover:bg-medical-blue/80 text-white rounded transition-colors"
-                   >
-                     Evaluation Instructions
-                   </button>
                  </div>
 
-                 {showInstructions && (
-                   <div className="rounded-lg border border-medical-dark-gray/40 bg-medical-darkest-gray p-4 space-y-4">
-                     <h4 className="text-sm font-medium text-medical-gray uppercase">
-                       How To Evaluate Properly
-                     </h4>
-                     <div className="space-y-4 text-xs text-medical-gray/90 leading-relaxed">
-                       <div>
-                         <p className="text-foreground font-semibold mb-1">1) Anatomical Validity</p>
-                         <p className="mb-1">Evaluate ONLY the generated image (ignore reference image and pathology region).</p>
-                         <p className="mb-1 text-foreground/90">Look for:</p>
-                         <ul className="list-disc pl-5 space-y-1">
-                           <li>Normal lung fields, ribs, clavicles, scapulae</li>
-                           <li>Normal cardiomediastinal silhouette, shape and position</li>
-                           <li>Normal diaphragm contours and bowel shadows</li>
-                         </ul>
-                       </div>
-
-                       <div>
-                         <p className="text-foreground font-semibold mb-1">2) Pathology Presence</p>
-                         <p className="mb-1">
-                           Evaluate only whether a pathology (finding) is present in the generated image. Do not assess whether the pathology (finding) is radiologically correct.
-                         </p>
-                         <p className="mb-1">Revisiting prompt structure: Right moderate pleural effusion = Right moderate (Attribute) + Pleural effusion (Finding).</p>
-                         <p className="mb-1 text-foreground/90">Focus ONLY on:</p>
-                         <ul className="list-disc pl-5 space-y-1 mb-1">
-                           <li>Presence of abnormality</li>
-                         </ul>
-                         <p className="mb-1 text-foreground/90">Ignore:</p>
-                         <ul className="list-disc pl-5 space-y-1">
-                           <li>Whether it is radiologically correct</li>
-                           <li>Whether secondary signs are present</li>
-                           <li>Whether the diagnosis is accurate</li>
-                         </ul>
-                       </div>
-
-                       <div>
-                         <p className="text-foreground font-semibold mb-1">3) Internal Consistency</p>
-                         <p className="mb-1">Evaluate whether the pathology (finding) is radiologically correct.</p>
-                         <p className="mb-1 text-foreground/90">Focus on:</p>
-                         <ul className="list-disc pl-5 space-y-1">
-                           <li>Radiological patterns fit the prompted pathology (finding)</li>
-                           <li>Presence or absence of expected secondary signs</li>
-                         </ul>
-                       </div>
-
-                       <div>
-                         <p className="text-foreground font-semibold mb-1">4) Attribute concordance</p>
-                         <p>
-                           Evaluate whether attribute, location, and side of the prompted pathology (finding) is accurate. Revisiting prompt
-                           structure: Right moderate pleural effusion = Right moderate (Attribute) + Pleural effusion (Finding).
-                         </p>
-                       </div>
-
-                       <div>
-                         <p className="text-foreground font-semibold mb-1">5) Similarity index</p>
-                         <p className="mb-1">
-                           Evaluate only the background features (ignoring the generated pathology) of the generated image compared to the reference image.
-                         </p>
-                         <p className="mb-1 text-foreground/90">Carefully look for:</p>
-                         <ul className="list-disc pl-5 space-y-1">
-                           <li>Same radiographic marker</li>
-                           <li>Same breast shadow</li>
-                           <li>Same bowel or stomach gas</li>
-                           <li>Presence of additional hallucinated artefacts</li>
-                           <li>Increased or decreased graininess</li>
-                           <li>Any signs that the background chest X-ray is not from the same patient</li>
-                         </ul>
-                       </div>
-                     </div>
-                   </div>
-                 )}
-                
                 {metrics.map((metric) => {
-                  const guidelines = METRIC_GUIDELINES[metric.name] || {
+                  const metricKey = METRIC_KEY(metric.name)
+                  const guidelines = METRIC_GUIDELINES[metricKey] || {
                     1: 'Positive / Correct',
                     0: 'Negative / Incorrect'
                   };
+                  const instructions = METRIC_INSTRUCTIONS[metricKey]
+                  const isInstructionsOpen = activeInstructionMetric === metric.id
                   
                   return (
                     <div key={metric.id} className="space-y-3 pb-4 border-b border-medical-dark-gray/30 last:border-0">
-                      <div>
-                        <h4 className="text-base font-semibold text-foreground">{metric.name}</h4>
-                        <p className="text-xs text-medical-gray mt-1">{metric.description?.split('?')[0]}?</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-base font-semibold text-foreground">{metric.name}</h4>
+                          <p className="text-xs text-medical-gray mt-1">{metric.description?.split('?')[0]}?</p>
+                        </div>
+                        {instructions && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActiveInstructionMetric((current) =>
+                                current === metric.id ? null : metric.id
+                              )
+                            }
+                            className={cn(
+                              "shrink-0 px-3 py-1 text-xs font-medium rounded transition-colors",
+                              isInstructionsOpen
+                                ? "bg-medical-blue text-white hover:bg-medical-blue/80"
+                                : "bg-medical-dark-gray/50 text-medical-gray hover:bg-medical-dark-gray/80 hover:text-foreground"
+                            )}
+                          >
+                            Instructions
+                          </button>
+                        )}
                       </div>
+
+                      {isInstructionsOpen && instructions && (
+                        <div className="rounded-lg border border-medical-dark-gray/40 bg-medical-darkest-gray p-4">
+                          {instructions}
+                        </div>
+                      )}
                       
                       <div className="grid grid-cols-2 gap-3">
                         {/* Option 1 */}
