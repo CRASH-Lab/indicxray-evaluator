@@ -350,9 +350,11 @@ function SupervisorDashboard() {
       return 'Invalid Date';
     }
   }
-
-  function goBack() {
-    navigate('/supervisor')
+  function handleLogout() {
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('userId')
+    localStorage.removeItem('userRole')
+    navigate('/supervisor', { replace: true })
   }
 
   const handleTabChange = (nextTab: string) => {
@@ -412,8 +414,7 @@ function SupervisorDashboard() {
               <Button variant="default" onClick={() => navigate('/supervisor/users')}>
                 Manage Users
               </Button>
-              <Button variant="outline" onClick={goBack}>Back to Login</Button>
-            </div>
+              <Button variant="outline" onClick={handleLogout}>Log out</Button>            </div>
           </div>
         </CardHeader>
       </Card>
