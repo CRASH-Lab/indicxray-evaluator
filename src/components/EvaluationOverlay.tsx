@@ -430,13 +430,13 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
           {/* Right Side - Model Response & Evaluation Metrics */}
           <div className="w-1/3 flex flex-col overflow-y-auto">
             <div className="p-6 space-y-6">
-              {/* Structured Prompt */}
+              {/* Pathology to be inserted */}
               <div className="bg-medical-dark-gray/30 rounded-lg border border-medical-dark-gray/30 p-4">
                 <h3 className="text-sm font-medium text-medical-gray uppercase mb-2">
-                  Structured Prompt:
+                  Pathology to be inserted:
                 </h3>
                 <p className="text-sm text-foreground whitespace-pre-wrap">
-                  {structuredPromptText || 'No structured prompt available'}
+                  {structuredPromptText || 'No pathology to be inserted available'}
                 </p>
               </div>
 
