@@ -155,7 +155,7 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
             {/* Model Label */}
             <div className="bg-medical-dark-gray/50 border-t border-medical-dark-gray/30 p-3">
               <p className="text-sm font-medium text-medical-gray">
-                MODEL {model.modelName}
+                {model.modelName}
               </p>
             </div>
           </button>

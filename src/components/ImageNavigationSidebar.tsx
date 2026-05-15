@@ -73,7 +73,7 @@ export const GroundTruthPanel: React.FC<GroundTruthPanelProps> = ({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div>
           <h3 className="text-xs font-medium text-medical-gray uppercase mb-2">
-            STRUCTURED PROMPT
+            PATHOLOGY TO BE INSERTED
           </h3>
           <p className="text-sm text-foreground leading-relaxed bg-medical-blue/10 border-l-2 border-medical-blue p-3 rounded">
             {groundTruth.findings}
