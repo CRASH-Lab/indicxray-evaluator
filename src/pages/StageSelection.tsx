@@ -1,12 +1,15 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Stethoscope } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog'
+import { Stethoscope, Play } from 'lucide-react'
 // import { BrainCircuit } from 'lucide-react'
 
 function StageSelection() {
   const { userId } = useParams()
   const navigate = useNavigate()
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false)
 
   const handleLogout = () => {
       localStorage.removeItem('authToken')
@@ -36,8 +39,19 @@ function StageSelection() {
             <CardTitle className="text-2xl text-white">Stage 1: Clinical Diagnosis</CardTitle>
             <CardDescription>Evaluate X-ray images for clinical findings and write reports.</CardDescription>
           </CardHeader>
-          <CardContent className="text-center pt-4">
+          <CardContent className="text-center pt-4 space-y-3">
             <Button className="w-full bg-blue-600 hover:bg-blue-700">Enter Stage 1</Button>
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsTutorialOpen(true)
+              }}
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Watch Tutorial
+            </Button>
           </CardContent>
         </Card>
 
@@ -57,6 +71,53 @@ function StageSelection() {
         </Card>
         */}
       </div>
+
+      {/* Tutorial Modal - Placeholder for Video/GIF */}
+      <Dialog open={isTutorialOpen} onOpenChange={setIsTutorialOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Stage 1: Clinical Diagnosis Tutorial</DialogTitle>
+          </DialogHeader>
+          
+          <div className="w-full bg-slate-900/50 rounded-lg p-12 flex flex-col items-center justify-center min-h-96 border-2 border-dashed border-slate-700">
+            <Play className="w-16 h-16 text-blue-400 mb-4 opacity-50" />
+            <p className="text-gray-400 text-center text-lg mb-2">Tutorial Video Placeholder</p>
+            <p className="text-gray-500 text-sm text-center">
+              Tutorial content will be displayed here.<br />
+              This will be replaced with a video file or GIF from Supabase storage.
+            </p>
+          </div>
+
+          <div className="mt-6 text-sm text-gray-400 bg-slate-800/50 rounded p-4">
+            <p className="font-semibold text-white mb-2">Tutorial Topics:</p>
+            <ul className="list-disc list-inside space-y-1 text-xs">
+              <li>How to navigate X-ray images</li>
+              <li>Identifying clinical findings</li>
+              <li>Writing effective clinical reports</li>
+              <li>Submitting your evaluation</li>
+            </ul>
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsTutorialOpen(false)}
+              className="flex-1"
+            >
+              Close
+            </Button>
+            <Button 
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setIsTutorialOpen(false)
+                navigate(`/doctor/${userId}`)
+              }}
+            >
+              Proceed to Stage 1
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
