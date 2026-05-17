@@ -21,13 +21,13 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
     const statusConfig = {
       completed: { label: 'Completed', className: 'bg-green-500/20 text-green-500 border-green-500/50' },
       in_progress: { label: 'Scoring', className: 'bg-orange-500/20 text-orange-500 border-orange-500/50' },
-      pending: { label: 'Pending', className: 'bg-gray-500/20 text-gray-500 border-gray-500/50' },
+      pending: { label: 'Pending', className: 'bg-red-500/20 text-red-500 border-red-500/50' },
     }
     
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending
     
     return (
-      <Badge variant="outline" className={cn("text-xs font-medium border", config.className)}>
+      <Badge variant="outline" className={cn("text-xs font-medium border px-2 py-0.5 rounded", config.className)}>
         {config.label}
       </Badge>
     )
@@ -92,7 +92,7 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        {models.map((model) => {
+        {models.map((model, idx) => {
           return (
           <button
             key={model.id}
@@ -152,11 +152,11 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
               </div>
             )}
 
-            {/* Model Label */}
-            <div className="bg-medical-dark-gray/50 border-t border-medical-dark-gray/30 p-3">
-              <p className="text-sm font-medium text-medical-gray">
-                {model.modelName}
-              </p>
+            {/* Model Label - show Model number as blue button (title contains full model name) */}
+            <div className="bg-medical-dark-gray/50 border-t border-medical-dark-gray/30 p-3 flex items-center">
+              <button title={model.modelName} className="bg-blue-500 text-white font-bold text-sm px-3 py-1 rounded-md">
+                Model {idx + 1}
+              </button>
             </div>
           </button>
           )
