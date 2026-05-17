@@ -172,6 +172,7 @@ function DashboardSidebar({
   doctorName: string
   onLogout: () => void
 }) {
+  return (
     <>
       {/* Mobile Overlay */}
       {isOpen && (
