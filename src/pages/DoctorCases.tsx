@@ -165,12 +165,14 @@ function DashboardSidebar({
   isOpen, 
   onClose,
   doctorName,
-  onLogout
+  onLogout,
+  casesData
 }: { 
   isOpen: boolean
   onClose: () => void
   doctorName: string
   onLogout: () => void
+  casesData: CasesResponse | null
 }) {
   return (
     <>
@@ -207,13 +209,51 @@ function DashboardSidebar({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 overflow-y-auto">
+        <nav className="flex-1 px-4 py-6 overflow-y-auto space-y-6">
           <button
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors bg-blue-500/20 text-blue-300 border border-blue-500/30"
           >
             <ListChecks className="w-5 h-5" />
             <span className="font-medium text-sm">Assigned Cases</span>
           </button>
+
+          {/* Case Status Overview */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Status Overview</p>
+            
+            {/* Completed */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-emerald-500/10 border-emerald-500/30">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span className="text-sm text-emerald-300 font-medium">Completed</span>
+              </div>
+              <span className="text-xs font-bold text-emerald-300 bg-emerald-500/20 px-2 py-1 rounded">
+                {casesData?.completed_cases || 0}
+              </span>
+            </div>
+
+            {/* In Progress */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-blue-500/10 border-blue-500/30">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-blue-400" />
+                <span className="text-sm text-blue-300 font-medium">In Progress</span>
+              </div>
+              <span className="text-xs font-bold text-blue-300 bg-blue-500/20 px-2 py-1 rounded">
+                {casesData?.in_progress_cases || 0}
+              </span>
+            </div>
+
+            {/* Pending */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-amber-500/10 border-amber-500/30">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-400" />
+                <span className="text-sm text-amber-300 font-medium">Pending</span>
+              </div>
+              <span className="text-xs font-bold text-amber-300 bg-amber-500/20 px-2 py-1 rounded">
+                {casesData?.pending_cases || 0}
+              </span>
+            </div>
+          </div>
         </nav>
 
         {/* Bottom Actions */}
@@ -350,6 +390,7 @@ function DoctorCases() {
           onClose={() => setSidebarOpen(false)}
           doctorName={doctorInfo.name}
           onLogout={handleLogout}
+          casesData={casesData}
         />
 
         {/* Main Content */}
