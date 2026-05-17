@@ -172,15 +172,6 @@ function DashboardSidebar({
   doctorName: string
   onLogout: () => void
 }) {
-  const navItems = [
-    { icon: LayoutDashboard, label: 'Overview', id: 'overview', active: true },
-    { icon: ListChecks, label: 'Assigned Cases', id: 'cases', active: true },
-    { icon: Clock, label: 'Pending Reviews', id: 'pending', active: false },
-    { icon: CheckCircle2, label: 'Completed', id: 'completed', active: false },
-    { icon: TrendingUp, label: 'Analytics', id: 'analytics', active: false },
-  ]
-
-  return (
     <>
       {/* Mobile Overlay */}
       {isOpen && (
@@ -215,44 +206,23 @@ function DashboardSidebar({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                item.active
-                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                  : 'text-gray-400 hover:bg-slate-800/50 hover:text-gray-300'
-              } ${!item.active && 'opacity-50 cursor-not-allowed'}`}
-              disabled={!item.active}
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="font-medium text-sm">{item.label}</span>
-              {item.active && item.id !== 'overview' && <ChevronRight className="w-4 h-4 ml-auto" />}
-            </button>
-          ))}
+        <nav className="flex-1 px-4 py-6 overflow-y-auto">
+          <button
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors bg-blue-500/20 text-blue-300 border border-blue-500/30"
+          >
+            <ListChecks className="w-5 h-5" />
+            <span className="font-medium text-sm">Assigned Cases</span>
+          </button>
         </nav>
 
         {/* Bottom Actions */}
-        <div className="px-4 py-6 border-t border-slate-800 space-y-2">
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-slate-800/50 hover:text-gray-300 transition-colors">
-            <Bell className="w-5 h-5" />
-            <span className="text-sm font-medium">Notifications</span>
-          </button>
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-slate-800/50 hover:text-gray-300 transition-colors">
-            <Settings className="w-5 h-5" />
-            <span className="text-sm font-medium">Settings</span>
-          </button>
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-slate-800/50 hover:text-gray-300 transition-colors">
-            <User className="w-5 h-5" />
-            <span className="text-sm font-medium">Profile</span>
-          </button>
+        <div className="px-4 py-6 border-t border-slate-800">
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors font-medium text-sm"
           >
             <LogOut className="w-5 h-5" />
-            <span className="text-sm font-medium">Logout</span>
+            <span>Logout</span>
           </button>
         </div>
       </div>
