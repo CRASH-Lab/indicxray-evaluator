@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,12 @@ function StageSelection() {
   const { userId } = useParams()
   const navigate = useNavigate()
   const [isTutorialOpen, setIsTutorialOpen] = useState(false)
+  const [showLoginTutorialPrompt, setShowLoginTutorialPrompt] = useState(false)
+
+  useEffect(() => {
+    // Show tutorial prompt when user logs in
+    setShowLoginTutorialPrompt(true)
+  }, [])
 
   const handleLogout = () => {
       localStorage.removeItem('authToken')
@@ -40,7 +46,6 @@ function StageSelection() {
             <CardDescription>Evaluate X-ray images for clinical findings and write reports.</CardDescription>
           </CardHeader>
           <CardContent className="text-center pt-4 space-y-3">
-            <Button className="w-full bg-blue-600 hover:bg-blue-700">Enter Stage 1</Button>
             <Button 
               variant="outline" 
               className="w-full" 
@@ -52,6 +57,7 @@ function StageSelection() {
               <Play className="w-4 h-4 mr-2" />
               Watch Tutorial
             </Button>
+            <Button className="w-full bg-blue-600 hover:bg-blue-700">Enter Stage 1</Button>
           </CardContent>
         </Card>
 
@@ -114,6 +120,45 @@ function StageSelection() {
               }}
             >
               Proceed to Stage 1
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Login Tutorial Prompt Modal */}
+      <Dialog open={showLoginTutorialPrompt} onOpenChange={setShowLoginTutorialPrompt}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">Welcome to Stage 1 Evaluation</DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-6 text-center">
+            <div className="mx-auto bg-blue-500/10 p-4 rounded-full w-fit mb-4">
+              <Play className="w-12 h-12 text-blue-400" />
+            </div>
+            <p className="text-gray-300 mb-2 font-medium">Want to learn how to evaluate X-ray images?</p>
+            <p className="text-gray-400 text-sm">
+              We recommend watching a quick tutorial to familiarize yourself with the evaluation process.
+            </p>
+          </div>
+
+          <div className="flex gap-3 flex-col-reverse">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowLoginTutorialPrompt(false)}
+              className="w-full"
+            >
+              Skip Tutorial
+            </Button>
+            <Button 
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setShowLoginTutorialPrompt(false)
+                setIsTutorialOpen(true)
+              }}
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Watch Tutorial
             </Button>
           </div>
         </DialogContent>
