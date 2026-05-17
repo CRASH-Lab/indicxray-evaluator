@@ -284,8 +284,8 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
           <div className="w-2/3 bg-black border-r border-medical-dark-gray/30 flex relative flex-col">
             <div className="flex-1 flex overflow-hidden">
             {/* Ground Truth Image */}
-              <div className="flex-1 flex flex-col relative border-r border-medical-dark-gray/50">
-                <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-black/60 rounded text-sm font-medium text-white backdrop-blur-sm border border-white/10">
+              <div className="flex-1 flex flex-col relative border-r border-medical-dark-gray/50 bg-gradient-to-br from-blue-500/10 to-emerald-500/10">
+                <div className="absolute top-4 left-4 z-10 px-4 py-2 bg-emerald-500/30 rounded-lg text-sm font-bold text-emerald-100 backdrop-blur-sm border border-emerald-400/50">
                   Ground Truth
                 </div>
                 <div className="flex-1 flex items-center justify-center p-6">
@@ -356,8 +356,8 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
 
               {/* Evaluated Image */}
               <div className="flex-1 flex flex-col relative">
-                <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-medical-blue/80 rounded text-sm font-medium text-white backdrop-blur-sm border border-medical-blue">
-                  Model Output ({model.modelName})
+                <div className="absolute top-4 left-4 z-10 px-4 py-2 bg-blue-500/30 rounded-lg text-sm font-bold text-blue-100 backdrop-blur-sm border border-blue-400/50">
+                  {model.modelName}
                 </div>
                 <div className="flex-1 flex items-center justify-center p-6">
                   {currentUrl ? (
@@ -460,7 +460,7 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h4 className="text-base font-semibold text-foreground">{metric.name}</h4>
-                          <p className="text-xs text-medical-gray mt-1">{metric.description?.split('?')[0]}?</p>
+                          <p className="text-xs text-white mt-1">{metric.description?.split('?')[0]}?</p>
                         </div>
                         {instructions && (
                           <button
@@ -471,10 +471,8 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
                               )
                             }
                             className={cn(
-                              "shrink-0 px-3 py-1 text-xs font-medium rounded transition-colors",
-                              isInstructionsOpen
-                                ? "bg-medical-blue text-white hover:bg-medical-blue/80"
-                                : "bg-medical-dark-gray/50 text-medical-gray hover:bg-medical-dark-gray/80 hover:text-foreground"
+                              "shrink-0 px-3 py-2 text-xs font-bold rounded-lg transition-colors",
+                              "bg-blue-500/30 text-blue-100 border border-blue-400/50 hover:bg-blue-500/40"
                             )}
                           >
                             Instructions
@@ -505,7 +503,10 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
                               scores[metric.id] === 1 ? "bg-green-500 text-white" : "bg-medical-gray text-medical-darkest-gray"
                             )}>1</span>
                           </div>
-                          <p className="text-xs text-medical-gray/80 leading-relaxed">
+                          <p className={cn(
+                            "text-xs leading-relaxed",
+                            scores[metric.id] === 1 ? "text-green-300 font-medium" : "text-white"
+                          )}>
                             {guidelines[1]}
                           </p>
                         </button>
@@ -526,7 +527,10 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
                               scores[metric.id] === 0 ? "bg-red-500 text-white" : "bg-medical-gray text-medical-darkest-gray"
                             )}>0</span>
                           </div>
-                          <p className="text-xs text-medical-gray/80 leading-relaxed">
+                          <p className={cn(
+                            "text-xs leading-relaxed",
+                            scores[metric.id] === 0 ? "text-red-300 font-medium" : "text-white"
+                          )}>
                             {guidelines[0]}
                           </p>
                         </button>
