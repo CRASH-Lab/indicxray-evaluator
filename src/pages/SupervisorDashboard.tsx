@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { 
   Card, 
@@ -8,6 +8,7 @@ import {
   CardDescription 
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { 
   Table, 
   TableBody, 
@@ -120,6 +121,9 @@ function SupervisorDashboard() {
   const [caseTab, setCaseTab] = useState<'original' | 'cross'>('original')
   const [evaluationsPage, setEvaluationsPage] = useState(initialPage)
   const [evaluationsPageSize] = useState(100)
+  const [evaluationsQuery, setEvaluationsQuery] = useState('')
+  const [evaluationsSortBy, setEvaluationsSortBy] = useState<'case' | 'evaluator' | 'model' | 'metric' | 'status' | 'date'>('date')
+  const [evaluationsSortDirection, setEvaluationsSortDirection] = useState<'asc' | 'desc'>('desc')
   const [evaluationsPagination, setEvaluationsPagination] = useState<PaginatedEvaluationsResponse>({
     count: 0,
     next: null,
@@ -549,8 +553,8 @@ function SupervisorDashboard() {
     setEvaluationsPage(1)
     setSelectedEvaluator(null)
     updateDashboardUrl({
-      tab: 'evaluations',
-      page: 1,
+      tab: activeTab,
+      page: activeTab === 'evaluations' ? 1 : evaluationsPage,
       evaluator: null,
     })
   }
@@ -587,6 +591,71 @@ function SupervisorDashboard() {
 
     return leftRatio - rightRatio
   })
+
+  const filteredAndSortedEvaluations = useMemo(() => {
+    const query = evaluationsQuery.trim().toLowerCase()
+
+    const filtered = evaluations.filter((evaluation, index) => {
+      if (!query) return true
+
+      const evaluatorName = evaluators.find((evaluator) => evaluator.id === evaluation.evaluator_id)?.name || evaluation.evaluator_id
+      const modelIndex = evaluations
+        .filter(item => item.case_id === evaluation.case_id)
+        .findIndex(item => item.model_id === evaluation.model_id)
+      const modelName = getModelDisplayName(evaluation.model_name || 'Unknown', modelIndex >= 0 ? modelIndex : index)
+      const metricName = getMetricName(evaluation.metric_id, evaluation.metric_name)
+      const scoreLabel = getScoreBadge(evaluation.score).label
+      const statusText = scoreLabel.toLowerCase()
+
+      return [
+        evaluation.case_id,
+        evaluatorName,
+        evaluation.model_name,
+        modelName,
+        metricName,
+        scoreLabel,
+        statusText,
+        evaluation.created_at,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    })
+
+    const directionFactor = evaluationsSortDirection === 'asc' ? 1 : -1
+
+    return [...filtered].sort((left, right) => {
+      const leftCaseIndex = evaluations.findIndex(item => item.id === left.id)
+      const rightCaseIndex = evaluations.findIndex(item => item.id === right.id)
+      const leftEvaluatorName = evaluators.find((evaluator) => evaluator.id === left.evaluator_id)?.name || left.evaluator_id
+      const rightEvaluatorName = evaluators.find((evaluator) => evaluator.id === right.evaluator_id)?.name || right.evaluator_id
+      const leftModelIndex = evaluations
+        .filter(item => item.case_id === left.case_id)
+        .findIndex(item => item.model_id === left.model_id)
+      const rightModelIndex = evaluations
+        .filter(item => item.case_id === right.case_id)
+        .findIndex(item => item.model_id === right.model_id)
+      const leftModelName = getModelDisplayName(left.model_name || 'Unknown', leftModelIndex >= 0 ? leftModelIndex : leftCaseIndex)
+      const rightModelName = getModelDisplayName(right.model_name || 'Unknown', rightModelIndex >= 0 ? rightModelIndex : rightCaseIndex)
+      const leftMetricName = getMetricName(left.metric_id, left.metric_name)
+      const rightMetricName = getMetricName(right.metric_id, right.metric_name)
+      const leftStatus = getScoreBadge(left.score).label
+      const rightStatus = getScoreBadge(right.score).label
+      const leftDate = new Date(left.created_at).getTime() || 0
+      const rightDate = new Date(right.created_at).getTime() || 0
+
+      const compareMap: Record<typeof evaluationsSortBy, number> = {
+        case: String(left.case_id).localeCompare(String(right.case_id)),
+        evaluator: leftEvaluatorName.localeCompare(rightEvaluatorName),
+        model: leftModelName.localeCompare(rightModelName),
+        metric: leftMetricName.localeCompare(rightMetricName),
+        status: leftStatus.localeCompare(rightStatus),
+        date: leftDate - rightDate,
+      }
+
+      const comparison = compareMap[evaluationsSortBy]
+      return comparison === 0 ? 0 : comparison * directionFactor
+    })
+  }, [evaluations, evaluationsQuery, evaluationsSortBy, evaluationsSortDirection, metrics, evaluators, getMetricName])
 
   return (
     <div className="container mx-auto py-8">
@@ -952,91 +1021,133 @@ function SupervisorDashboard() {
                 })()
               ) : (
                 // Display all evaluations when no evaluator is selected
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Case ID</TableHead>
-                      <TableHead>Evaluator</TableHead>
-                      <TableHead>Model</TableHead>
-                      <TableHead>Metric</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {evaluations.length === 0 ? (
+                <div className="space-y-4">
+                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1.6fr)_220px_170px] lg:items-end">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Filter evaluations</label>
+                      <Input
+                        value={evaluationsQuery}
+                        onChange={(event) => setEvaluationsQuery(event.target.value)}
+                        placeholder="Search case, evaluator, model, metric, or status"
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Sort by</label>
+                      <Select value={evaluationsSortBy} onValueChange={(value) => setEvaluationsSortBy(value as typeof evaluationsSortBy)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sort by" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="date">Date</SelectItem>
+                          <SelectItem value="case">Case ID</SelectItem>
+                          <SelectItem value="evaluator">Evaluator</SelectItem>
+                          <SelectItem value="model">Model</SelectItem>
+                          <SelectItem value="metric">Metric</SelectItem>
+                          <SelectItem value="status">Status</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Direction</label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between"
+                        onClick={() => setEvaluationsSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))}
+                      >
+                        <span>{evaluationsSortDirection === 'asc' ? 'Ascending' : 'Descending'}</span>
+                        <ArrowRight className={`h-4 w-4 transition-transform ${evaluationsSortDirection === 'asc' ? 'rotate-90' : '-rotate-90'}`} />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center">No evaluations found</TableCell>
+                        <TableHead>Case ID</TableHead>
+                        <TableHead>Evaluator</TableHead>
+                        <TableHead>Model</TableHead>
+                        <TableHead>Metric</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
                       </TableRow>
-                    ) : (
-                      evaluations.map((evaluation, index) => {
-                        const caseDetails = getCaseDetails(evaluation.case_id);
-                        const scoreBadge = getScoreBadge(evaluation.score)
-                        const modelIndex = evaluations
-                          .filter(item => item.case_id === evaluation.case_id)
-                          .findIndex(item => item.model_id === evaluation.model_id)
-                        return (
-                          <TableRow key={evaluation.id}>
-                            <TableCell>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-foreground">
-                                    {getCaseDisplayName(evaluation.case_id, index, caseDetails.image_id)}
-                                  </span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                                    onClick={() => void copyText(evaluation.case_id)}
-                                    aria-label="Copy case ID"
-                                  >
-                                    <Copy className="h-4 w-4" />
-                                  </Button>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAndSortedEvaluations.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center">No evaluations match the current filter</TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredAndSortedEvaluations.map((evaluation, index) => {
+                          const caseDetails = getCaseDetails(evaluation.case_id);
+                          const scoreBadge = getScoreBadge(evaluation.score)
+                          const modelIndex = filteredAndSortedEvaluations
+                            .filter(item => item.case_id === evaluation.case_id)
+                            .findIndex(item => item.model_id === evaluation.model_id)
+                          return (
+                            <TableRow key={evaluation.id}>
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-foreground">
+                                      {getCaseDisplayName(evaluation.case_id, index, caseDetails.image_id)}
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                      onClick={() => void copyText(evaluation.case_id)}
+                                      aria-label="Copy case ID"
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground font-mono break-all">{evaluation.case_id}</p>
                                 </div>
-                                <p className="text-xs text-muted-foreground font-mono break-all">{evaluation.case_id}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>{getEvaluatorName(evaluation.evaluator_id)}</TableCell>
-                            <TableCell>
-                              <div className="space-y-1">
-                                <div className="font-medium text-foreground">
-                                  {getModelDisplayName(evaluation.model_name || 'Unknown', modelIndex >= 0 ? modelIndex : 0)}
+                              </TableCell>
+                              <TableCell>{getEvaluatorName(evaluation.evaluator_id)}</TableCell>
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <div className="font-medium text-foreground">
+                                    {getModelDisplayName(evaluation.model_name || 'Unknown', modelIndex >= 0 ? modelIndex : 0)}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground font-mono break-all">
+                                    {evaluation.model_name || 'Unknown'}
+                                  </div>
                                 </div>
-                                <div className="text-xs text-muted-foreground font-mono break-all">
-                                  {evaluation.model_name || 'Unknown'}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>{getMetricName(evaluation.metric_id, evaluation.metric_name)}</TableCell>
-                            <TableCell>
-                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${scoreBadge.className}`}>
-                                {scoreBadge.label}
-                              </span>
-                            </TableCell>
-                            <TableCell>{formatDate(evaluation.created_at)}</TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant={evaluation.score === 0 ? 'destructive' : 'outline'}
-                                size="sm"
-                                onClick={() => openReviewDetails(evaluation, caseDetails.image_id)}
-                              >
-                                {evaluation.score === 0 ? 'Review Details' : 'Open Analysis'}
-                                <ArrowRight className="ml-2 h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+                              </TableCell>
+                              <TableCell>{getMetricName(evaluation.metric_id, evaluation.metric_name)}</TableCell>
+                              <TableCell>
+                                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${scoreBadge.className}`}>
+                                  {scoreBadge.label}
+                                </span>
+                              </TableCell>
+                              <TableCell>{formatDate(evaluation.created_at)}</TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant={evaluation.score === 0 ? 'destructive' : 'outline'}
+                                  size="sm"
+                                  onClick={() => openReviewDetails(evaluation, caseDetails.image_id)}
+                                >
+                                  {evaluation.score === 0 ? 'Review Details' : 'Open Analysis'}
+                                  <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
 
               {!loading.evaluations && !selectedEvaluator && (
                 <div className="flex items-center justify-between mt-4 gap-4">
                   <div className="text-sm text-muted-foreground">
-                    Showing page {evaluationsPagination.page} of {totalPages} ({evaluationsPagination.count} total evaluations)
+                    Showing {filteredAndSortedEvaluations.length} filtered evaluations on page {evaluationsPagination.page} of {totalPages} ({evaluationsPagination.count} total evaluations)
                   </div>
                   <div className="flex gap-2">
                     <Button
