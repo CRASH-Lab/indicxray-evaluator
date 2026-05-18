@@ -962,11 +962,11 @@ function SupervisorDashboard() {
                                         <div className="flex items-start justify-between gap-3">
                                           <div>
                                             <h4 className="font-medium text-lg text-foreground">
-                                              {getModelDisplayName(modelEvals[0]?.model_name || 'Unknown Model', modelIndex >= 0 ? modelIndex : 0)}
+                                              {(modelEvals[0]?.model_name && String(modelEvals[0]?.model_name).trim().length > 0)
+                                                ? String(modelEvals[0]?.model_name)
+                                                : getModelDisplayName('Unknown Model', modelIndex >= 0 ? modelIndex : 0)
+                                              }
                                             </h4>
-                                            <p className="text-xs text-muted-foreground font-mono break-all">
-                                              {modelEvals[0]?.model_name || 'Unknown Model'}
-                                            </p>
                                           </div>
                                           <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${modelStatusClassName}`}>
                                             {modelStatusLabel}
