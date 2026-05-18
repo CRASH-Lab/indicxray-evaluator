@@ -657,6 +657,17 @@ function SupervisorDashboard() {
     })
   })()
 
+  // Build a per-case model ordinal map for the current page's filtered/sorted evaluations
+  const modelOrdinalMap: Record<string, Record<string, number>> = {}
+  filteredAndSortedEvaluations.forEach(ev => {
+    const caseId = ev.case_id
+    const modelId = ev.model_id
+    if (!modelOrdinalMap[caseId]) modelOrdinalMap[caseId] = {}
+    if (modelOrdinalMap[caseId][modelId] === undefined) {
+      modelOrdinalMap[caseId][modelId] = Object.keys(modelOrdinalMap[caseId]).length
+    }
+  })
+
   return (
     <div className="container mx-auto py-8">
       <Card className="mb-6">
@@ -1083,9 +1094,9 @@ function SupervisorDashboard() {
                         filteredAndSortedEvaluations.map((evaluation, index) => {
                           const caseDetails = getCaseDetails(evaluation.case_id);
                           const scoreBadge = getScoreBadge(evaluation.score)
-                          const modelIndex = filteredAndSortedEvaluations
-                            .filter(item => item.case_id === evaluation.case_id)
-                            .findIndex(item => item.model_id === evaluation.model_id)
+                              const modelIndex = (modelOrdinalMap[evaluation.case_id] && typeof modelOrdinalMap[evaluation.case_id][evaluation.model_id] === 'number')
+                                ? modelOrdinalMap[evaluation.case_id][evaluation.model_id]
+                                : 0
                           return (
                             <TableRow key={evaluation.id}>
                               <TableCell>
@@ -1147,25 +1158,75 @@ function SupervisorDashboard() {
               {!loading.evaluations && !selectedEvaluator && (
                 <div className="flex items-center justify-between mt-4 gap-4">
                   <div className="text-sm text-muted-foreground">
-                    Showing {filteredAndSortedEvaluations.length} filtered evaluations on page {evaluationsPagination.page} of {totalPages} ({evaluationsPagination.count} total evaluations)
+                    {(() => {
+                      const page = Math.max(1, evaluationsPagination.page || 1)
+                      const pageSize = evaluationsPagination.page_size || evaluationsPageSize
+                      const total = Math.max(0, evaluationsPagination.count || 0)
+                      const from = Math.min(total, ((page - 1) * pageSize) + 1)
+                      const to = Math.min(total, ((page - 1) * pageSize) + filteredAndSortedEvaluations.length)
+                      return `Showing ${from}-${to} of ${total} evaluations`
+                    })()}
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={goToPreviousPage}
-                      disabled={!evaluationsPagination.previous}
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={goToNextPage}
-                      disabled={!evaluationsPagination.next}
-                    >
-                      Next
-                    </Button>
+                  <div className="flex gap-2 items-center">
+                    {(() => {
+                      const current = Math.max(1, evaluationsPagination.page || 1)
+                      const totalP = totalPages
+                      const pages: (number | string)[] = []
+
+                      if (totalP <= 7) {
+                        for (let i = 1; i <= totalP; i++) pages.push(i)
+                      } else {
+                        if (current <= 4) {
+                          pages.push(1, 2, 3, 4, '...', totalP)
+                        } else if (current >= totalP - 3) {
+                          pages.push(1, '...', totalP - 3, totalP - 2, totalP - 1, totalP)
+                        } else {
+                          pages.push(1, '...', current - 1, current, current + 1, '...', totalP)
+                        }
+                      }
+
+                      return (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={goToPreviousPage}
+                            disabled={!evaluationsPagination.previous}
+                          >
+                            Previous
+                          </Button>
+
+                          {pages.map((p, idx) => (
+                            typeof p === 'number' ? (
+                              <Button
+                                key={`page-${p}-${idx}`}
+                                size="sm"
+                                variant={p === current ? 'default' : 'outline'}
+                                onClick={() => {
+                                  const next = Number(p)
+                                  setEvaluationsPage(next)
+                                  updateDashboardUrl({ tab: 'evaluations', page: next })
+                                }}
+                                aria-current={p === current ? 'page' : undefined}
+                              >
+                                {p}
+                              </Button>
+                            ) : (
+                              <span key={`sep-${idx}`} className="px-2 text-sm text-muted-foreground">{String(p)}</span>
+                            )
+                          ))}
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={goToNextPage}
+                            disabled={!evaluationsPagination.next}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               )}
