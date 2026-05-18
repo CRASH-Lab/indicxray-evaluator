@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { 
   Card, 
@@ -592,7 +592,7 @@ function SupervisorDashboard() {
     return leftRatio - rightRatio
   })
 
-  const filteredAndSortedEvaluations = useMemo(() => {
+  const filteredAndSortedEvaluations = (() => {
     const query = evaluationsQuery.trim().toLowerCase()
 
     const filtered = evaluations.filter((evaluation, index) => {
@@ -655,7 +655,7 @@ function SupervisorDashboard() {
       const comparison = compareMap[evaluationsSortBy]
       return comparison === 0 ? 0 : comparison * directionFactor
     })
-  }, [evaluations, evaluationsQuery, evaluationsSortBy, evaluationsSortDirection, metrics, evaluators, getMetricName])
+  })()
 
   return (
     <div className="container mx-auto py-8">
