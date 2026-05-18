@@ -44,71 +44,71 @@ const METRIC_GUIDELINES: Record<string, { 1: ReactNode; 0: ReactNode }> = {
 
 const METRIC_INSTRUCTIONS: Record<string, ReactNode> = {
   [METRIC_KEY('Anatomical Validity')]: (
-    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
-      <p className="text-foreground font-semibold">1) Anatomical Validity</p>
-      <p>Evaluate ONLY the generated image (ignore reference image and pathology region).</p>
-      <p className="text-foreground/90">Look for:</p>
+    <div className="space-y-2 text-xs text-white leading-relaxed">
+      <p className="text-white font-semibold">1) Anatomical Validity</p>
+      <p className="text-white">Evaluate ONLY the generated image (ignore reference image and pathology region).</p>
+      <p className="text-white font-medium">Look for:</p>
       <ul className="list-disc pl-5 space-y-1">
-        <li>Normal lung fields, ribs, clavicles, scapulae</li>
-        <li>Normal cardiomediastinal silhouette, shape and position</li>
-        <li>Normal diaphragm contours and bowel shadows</li>
+        <li className="text-white">Normal lung fields, ribs, clavicles, scapulae</li>
+        <li className="text-white">Normal cardiomediastinal silhouette, shape and position</li>
+        <li className="text-white">Normal diaphragm contours and bowel shadows</li>
       </ul>
     </div>
   ),
   [METRIC_KEY('Pathology Presence')]: (
-    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
-      <p className="text-foreground font-semibold">2) Pathology Presence</p>
-      <p>
+    <div className="space-y-2 text-xs text-white leading-relaxed">
+      <p className="text-white font-semibold">2) Pathology Presence</p>
+      <p className="text-white">
         Evaluate only whether a pathology (finding) is present in the generated image. Do not assess whether the pathology (finding) is radiologically correct.
       </p>
-      <p>
+      <p className="text-white">
         Revisiting prompt structure: Right moderate pleural effusion = Right moderate (Attribute) + Pleural effusion (Finding).
       </p>
-      <p className="text-foreground/90">Focus ONLY on:</p>
+      <p className="text-white font-medium">Focus ONLY on:</p>
       <ul className="list-disc pl-5 space-y-1 mb-1">
-        <li>Presence of abnormality</li>
+        <li className="text-white">Presence of abnormality</li>
       </ul>
-      <p className="text-foreground/90">Ignore:</p>
+      <p className="text-white font-medium">Ignore:</p>
       <ul className="list-disc pl-5 space-y-1">
-        <li>Whether it is radiologically correct</li>
-        <li>Whether secondary signs are present</li>
-        <li>Whether the diagnosis is accurate</li>
+        <li className="text-white">Whether it is radiologically correct</li>
+        <li className="text-white">Whether secondary signs are present</li>
+        <li className="text-white">Whether the diagnosis is accurate</li>
       </ul>
     </div>
   ),
   [METRIC_KEY('Internal Consistency')]: (
-    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
-      <p className="text-foreground font-semibold">3) Internal Consistency</p>
-      <p>Evaluate whether the pathology (finding) is radiologically correct.</p>
-      <p className="text-foreground/90">Focus on:</p>
+    <div className="space-y-2 text-xs text-white leading-relaxed">
+      <p className="text-white font-semibold">3) Internal Consistency</p>
+      <p className="text-white">Evaluate whether the pathology (finding) is radiologically correct.</p>
+      <p className="text-white font-medium">Focus on:</p>
       <ul className="list-disc pl-5 space-y-1">
-        <li>Radiological patterns fit the prompted pathology (finding)</li>
-        <li>Presence or absence of expected secondary signs</li>
+        <li className="text-white">Radiological patterns fit the prompted pathology (finding)</li>
+        <li className="text-white">Presence or absence of expected secondary signs</li>
       </ul>
     </div>
   ),
   [METRIC_KEY('Attribute Concordance')]: (
-    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
-      <p className="text-foreground font-semibold">4) Attribute concordance</p>
-      <p>
+    <div className="space-y-2 text-xs text-white leading-relaxed">
+      <p className="text-white font-semibold">4) Attribute concordance</p>
+      <p className="text-white">
         Evaluate whether attribute, location, and side of the prompted pathology (finding) is accurate. Revisiting prompt structure: Right moderate pleural effusion = Right moderate (Attribute) + Pleural effusion (Finding).
       </p>
     </div>
   ),
   [METRIC_KEY('Similarity Index')]: (
-    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
-      <p className="text-foreground font-semibold">5) Similarity index</p>
-      <p>
+    <div className="space-y-2 text-xs text-white leading-relaxed">
+      <p className="text-white font-semibold">5) Similarity index</p>
+      <p className="text-white">
         Evaluate only the background features (ignoring the generated pathology) of the generated image compared to the reference image.
       </p>
-      <p className="text-foreground/90">Carefully look for:</p>
+      <p className="text-white font-medium">Carefully look for:</p>
       <ul className="list-disc pl-5 space-y-1">
-        <li>Same radiographic marker</li>
-        <li>Same breast shadow</li>
-        <li>Same bowel or stomach gas</li>
-        <li>Presence of additional hallucinated artefacts</li>
-        <li>Increased or decreased graininess</li>
-        <li>Any signs that the background chest X-ray is not from the same patient</li>
+        <li className="text-white">Same radiographic marker</li>
+        <li className="text-white">Same breast shadow</li>
+        <li className="text-white">Same bowel or stomach gas</li>
+        <li className="text-white">Presence of additional hallucinated artefacts</li>
+        <li className="text-white">Increased or decreased graininess</li>
+        <li className="text-white">Any signs that the background chest X-ray is not from the same patient</li>
       </ul>
     </div>
   ),
