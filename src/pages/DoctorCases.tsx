@@ -174,6 +174,8 @@ function DashboardSidebar({
   onLogout: () => void
   casesData: CasesResponse | null
 }) {
+  const [isStatusExpanded, setIsStatusExpanded] = useState(true)
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -211,47 +213,61 @@ function DashboardSidebar({
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 overflow-y-auto space-y-6">
           <button
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors bg-blue-500/20 text-blue-300 border border-blue-500/30"
+            onClick={() => setIsStatusExpanded(!isStatusExpanded)}
+            className="hidden lg:flex w-full items-center gap-3 px-4 py-3 rounded-lg transition-colors bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30"
           >
             <ListChecks className="w-5 h-5" />
             <span className="font-medium text-sm">Assigned Cases</span>
           </button>
 
-          {/* Case Status Overview */}
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Status Overview</p>
-            
-            {/* Completed */}
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-emerald-500/10 border-emerald-500/30">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm text-emerald-300 font-medium">Completed</span>
-              </div>
-              <span className="text-xs font-bold text-emerald-300 bg-emerald-500/20 px-2 py-1 rounded">
-                {casesData?.completed_cases || 0}
-              </span>
-            </div>
+          {/* Always show for mobile, conditionally show on desktop */}
+          <button
+            onClick={() => setIsStatusExpanded(!isStatusExpanded)}
+            className="lg:hidden w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors bg-blue-500/20 text-blue-300 border border-blue-500/30"
+          >
+            <ListChecks className="w-5 h-5" />
+            <span className="font-medium text-sm">Assigned Cases</span>
+          </button>
 
-            {/* In Progress */}
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-blue-500/10 border-blue-500/30">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-blue-400" />
-                <span className="text-sm text-blue-300 font-medium">In Progress</span>
+          {/* Case Status Overview - Collapsible on Desktop */}
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            isStatusExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 lg:hidden'
+          }`}>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Status Overview</p>
+              
+              {/* Completed */}
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-emerald-500/10 border-emerald-500/30">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span className="text-sm text-emerald-300 font-medium">Completed</span>
+                </div>
+                <span className="text-xs font-bold text-emerald-300 bg-emerald-500/20 px-2 py-1 rounded">
+                  {casesData?.completed_cases || 0}
+                </span>
               </div>
-              <span className="text-xs font-bold text-blue-300 bg-blue-500/20 px-2 py-1 rounded">
-                {casesData?.in_progress_cases || 0}
-              </span>
-            </div>
 
-            {/* Pending */}
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-amber-500/10 border-amber-500/30">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-400" />
-                <span className="text-sm text-amber-300 font-medium">Pending</span>
+              {/* In Progress */}
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-blue-500/10 border-blue-500/30">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm text-blue-300 font-medium">In Progress</span>
+                </div>
+                <span className="text-xs font-bold text-blue-300 bg-blue-500/20 px-2 py-1 rounded">
+                  {casesData?.in_progress_cases || 0}
+                </span>
               </div>
-              <span className="text-xs font-bold text-amber-300 bg-amber-500/20 px-2 py-1 rounded">
-                {casesData?.pending_cases || 0}
-              </span>
+
+              {/* Pending */}
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-amber-500/10 border-amber-500/30">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400" />
+                  <span className="text-sm text-amber-300 font-medium">Pending</span>
+                </div>
+                <span className="text-xs font-bold text-amber-300 bg-amber-500/20 px-2 py-1 rounded">
+                  {casesData?.pending_cases || 0}
+                </span>
+              </div>
             </div>
           </div>
         </nav>
