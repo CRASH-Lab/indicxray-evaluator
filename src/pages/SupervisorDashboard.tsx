@@ -643,6 +643,22 @@ function SupervisorDashboard() {
                         {Object.entries(batchEvaluations).map(([caseId, caseEvaluations], caseIndex) => {
                           const caseDetails = getCaseDetails(caseId)
                           const sortedModels = Array.from(new Set(caseEvaluations.map(evaluation => evaluation.model_id)))
+                          const completedMetrics = caseEvaluations.filter(evaluation => evaluation.score >= 1).length
+                          const hasIncompleteMetrics = completedMetrics < caseEvaluations.length
+                          const caseStatusLabel = caseEvaluations.length === 0
+                            ? 'No Metrics'
+                            : completedMetrics === caseEvaluations.length
+                              ? 'Completed'
+                              : completedMetrics === 0
+                                ? 'Pending Review'
+                                : `Score: ${completedMetrics}/${caseEvaluations.length}`
+                          const caseStatusClassName = caseEvaluations.length === 0
+                            ? 'border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300'
+                            : completedMetrics === caseEvaluations.length
+                              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                              : completedMetrics === 0
+                                ? 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300'
+                                : 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
                           const modelGroups = caseEvaluations.reduce((acc, evaluation) => {
                             if (!acc[evaluation.model_id]) acc[evaluation.model_id] = []
                             acc[evaluation.model_id].push(evaluation)
@@ -658,28 +674,55 @@ function SupervisorDashboard() {
                                       {getCaseDisplayName(caseId, caseIndex, caseDetails.image_id)}
                                     </div>
                                     <div className="text-xs text-muted-foreground font-mono break-all">
-                                      ID: {caseId}
+                                      ID: {caseId} · Click to expand and view {caseEvaluations.length} evaluation metrics
                                     </div>
                                   </div>
-                                  <span className="text-sm text-gray-500">
-                                    {caseEvaluations.length} evaluations
+                                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${caseStatusClassName}`}>
+                                    {caseStatusLabel}
                                   </span>
                                 </div>
                               </AccordionTrigger>
                               <AccordionContent>
                                 <div className="pt-2 pb-4 px-4">
-                                  {Object.entries(modelGroups).map(([modelId, modelEvals]) => {
+                                  {Object.entries(modelGroups).length === 0 ? (
+                                    <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+                                      No evaluation metrics are available for this case.
+                                    </div>
+                                  ) : (
+                                  Object.entries(modelGroups).map(([modelId, modelEvals]) => {
                                     const modelIndex = sortedModels.indexOf(modelId)
+                                    const modelCompletedMetrics = modelEvals.filter(evaluation => evaluation.score >= 1).length
+                                    const modelStatusLabel = modelEvals.length === 0
+                                      ? 'No Metrics'
+                                      : modelCompletedMetrics === modelEvals.length
+                                        ? 'Completed'
+                                        : modelCompletedMetrics === 0
+                                          ? 'Pending Review'
+                                          : `Score: ${modelCompletedMetrics}/${modelEvals.length}`
+                                    const modelStatusClassName = modelEvals.length === 0
+                                      ? 'border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300'
+                                      : modelCompletedMetrics === modelEvals.length
+                                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                        : modelCompletedMetrics === 0
+                                          ? 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300'
+                                          : 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
 
                                     return (
                                     <div key={modelId} className="mb-6 border rounded-lg p-4">
                                       <div className="mb-3">
-                                        <h4 className="font-medium text-lg text-foreground">
-                                          {getModelDisplayName(modelEvals[0]?.model_name || 'Unknown Model', modelIndex >= 0 ? modelIndex : 0)}
-                                        </h4>
-                                        <p className="text-xs text-muted-foreground font-mono break-all">
-                                          {modelEvals[0]?.model_name || 'Unknown Model'}
-                                        </p>
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div>
+                                            <h4 className="font-medium text-lg text-foreground">
+                                              {getModelDisplayName(modelEvals[0]?.model_name || 'Unknown Model', modelIndex >= 0 ? modelIndex : 0)}
+                                            </h4>
+                                            <p className="text-xs text-muted-foreground font-mono break-all">
+                                              {modelEvals[0]?.model_name || 'Unknown Model'}
+                                            </p>
+                                          </div>
+                                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${modelStatusClassName}`}>
+                                            {modelStatusLabel}
+                                          </span>
+                                        </div>
                                       </div>
                                       <Table>
                                         <TableHeader>
@@ -710,7 +753,7 @@ function SupervisorDashboard() {
                                       </Table>
                                     </div>
                                     )
-                                  })}
+                                  }))}
                                 </div>
                               </AccordionContent>
                             </AccordionItem>
@@ -822,7 +865,7 @@ function SupervisorDashboard() {
                 </Table>
               )}
 
-              {!loading.evaluations && (
+              {!loading.evaluations && !selectedEvaluator && (
                 <div className="flex items-center justify-between mt-4 gap-4">
                   <div className="text-sm text-muted-foreground">
                     Showing page {evaluationsPagination.page} of {totalPages} ({evaluationsPagination.count} total evaluations)
