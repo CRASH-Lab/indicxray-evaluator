@@ -420,7 +420,21 @@ async function getAllCases() {
 async function getAllEvaluators() {
   try {
     const response = await instance.get("admin/users/");
-    return response.data;
+    const data = response.data;
+
+    // Normalize common API shapes to an array of evaluators
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.results)) return data.results;
+    if (Array.isArray(data.users)) return data.users;
+    if (Array.isArray(data.data)) return data.data;
+
+    // If the API returns a single object mapping ids to user objects, extract values
+    if (data && typeof data === 'object') {
+      const values = Object.values(data).filter(v => v && typeof v === 'object' && v.id)
+      if (values.length > 0) return values as any[]
+    }
+
+    return [];
   } catch (error) {
     console.error("Error fetching evaluators:", error);
     return [];

@@ -29,6 +29,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { 
   Accordion,
   AccordionContent,
@@ -36,8 +41,17 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
   getAllEvaluators,
   getMetrics,
+  getUserDetails,
   adminGetAssignments,
   adminGetEvaluations,
   adminGetAllEvaluatorEvaluations,
@@ -102,6 +116,7 @@ function SupervisorDashboard() {
   const [metrics, setMetrics] = useState<Metric[]>([])
   const [stage2Stats, setStage2Stats] = useState<any>(null)
   const [selectedEvaluator, setSelectedEvaluator] = useState<string | null>(initialEvaluator)
+  const [evaluatorPickerOpen, setEvaluatorPickerOpen] = useState(false)
   const [caseTab, setCaseTab] = useState<'original' | 'cross'>('original')
   const [evaluationsPage, setEvaluationsPage] = useState(initialPage)
   const [evaluationsPageSize] = useState(100)
@@ -123,8 +138,54 @@ function SupervisorDashboard() {
   })
   const [error, setError] = useState('')
   const selectedEvaluatorDetails = selectedEvaluator
-    ? evaluators.find((evaluator) => evaluator.id === selectedEvaluator) || null
+    ? (evaluators.find((evaluator) => {
+        if (!evaluator) return false
+        const idCandidates = [
+          // common id fields returned by various backends
+          (evaluator as any).id,
+          (evaluator as any).pk,
+          (evaluator as any).user_id,
+          (evaluator as any).uuid,
+        ].filter(Boolean).map(String)
+
+        if (idCandidates.includes(String(selectedEvaluator))) return true
+
+        // fallback: allow matching by email
+        if ((evaluator as any).email && String((evaluator as any).email) === String(selectedEvaluator)) return true
+
+        return false
+      }) as Evaluator) || null
     : null
+
+  const selectedEvaluatorLabel =
+    selectedEvaluatorDetails?.name || selectedEvaluatorDetails?.email || selectedEvaluator || ''
+
+  // If a selected evaluator id exists but we couldn't find details in the initial list,
+  // attempt to fetch the user's details from the API so the UI can show their card.
+  useEffect(() => {
+    if (!selectedEvaluator) return
+    if (selectedEvaluatorDetails) return
+
+    let mounted = true
+    ;(async () => {
+      try {
+        const user = await getUserDetails(selectedEvaluator)
+        if (!mounted || !user) return
+        // append to evaluators list so subsequent lookups work
+        setEvaluators(prev => {
+          // avoid duplicates
+          if (prev.find(e => String((e as any).id) === String(user.id))) return prev
+          return [...prev, user as Evaluator]
+        })
+      } catch (err) {
+        console.warn('Failed to fetch selected evaluator details:', err)
+      }
+    })()
+
+    return () => {
+      mounted = false
+    }
+  }, [selectedEvaluator, selectedEvaluatorDetails])
 
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab') || 'evaluations'
@@ -158,13 +219,13 @@ function SupervisorDashboard() {
 
     if (nextTab === 'evaluations') {
       params.set('page', String(nextPage))
-      if (nextEvaluator) {
-        params.set('evaluator', nextEvaluator)
-      } else {
-        params.delete('evaluator')
-      }
     } else {
       params.delete('page')
+    }
+
+    if (nextEvaluator) {
+      params.set('evaluator', nextEvaluator)
+    } else {
       params.delete('evaluator')
     }
 
@@ -468,6 +529,9 @@ function SupervisorDashboard() {
 
   const handleEvaluatorSelect = (evaluatorId: string) => {
     setSelectedEvaluator(evaluatorId)
+    setEvaluatorPickerOpen(false)
+    // Persist selection to URL without leaving the current tab
+    updateDashboardUrl({ tab: activeTab, page: activeTab === 'evaluations' ? 1 : evaluationsPage, evaluator: evaluatorId })
   }
 
   const handleViewSelectedEvaluatorEvaluations = (evaluatorId: string) => {
@@ -583,37 +647,63 @@ function SupervisorDashboard() {
                         </span>
                       </div>
 
-                      <Select value={selectedEvaluator ?? undefined} onValueChange={handleEvaluatorSelect}>
-                        <SelectTrigger className="h-12 border-slate-700 bg-slate-950/70 text-left text-white shadow-inner shadow-black/20">
-                          <SelectValue placeholder="Choose an evaluator" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {evaluators.map((evaluator) => (
-                            <SelectItem key={evaluator.id} value={evaluator.id}>
-                              <div className="flex flex-col text-left">
-                                <span className="font-medium">{evaluator.name}</span>
-                                <span className="text-xs text-muted-foreground">{evaluator.email}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={evaluatorPickerOpen} onOpenChange={setEvaluatorPickerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="h-12 w-full justify-between border-slate-700 bg-slate-950/70 text-left text-white shadow-inner shadow-black/20 hover:bg-slate-900"
+                          >
+                            <span className="truncate">
+                              {selectedEvaluatorLabel || 'Choose an evaluator'}
+                            </span>
+                            <span className="ml-3 text-xs text-slate-400">Search</span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search evaluator by name or email..." />
+                            <CommandList className="max-h-72">
+                              <CommandEmpty>No evaluator matches your search.</CommandEmpty>
+                              <CommandGroup>
+                                {evaluators.map((evaluator) => {
+                                  const evaluatorId = String((evaluator as any).id ?? (evaluator as any).pk ?? (evaluator as any).email)
+                                  const evaluatorName = String((evaluator as any).name ?? 'Unknown evaluator')
+                                  const evaluatorEmail = String((evaluator as any).email ?? '')
+
+                                  return (
+                                    <CommandItem
+                                      key={evaluatorId}
+                                      value={`${evaluatorName} ${evaluatorEmail}`}
+                                      onSelect={() => handleEvaluatorSelect(evaluatorId)}
+                                    >
+                                      <div className="flex w-full flex-col text-left">
+                                        <span className="font-medium">{evaluatorName}</span>
+                                        <span className="text-xs text-muted-foreground">{evaluatorEmail}</span>
+                                      </div>
+                                    </CommandItem>
+                                  )
+                                })}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
 
-                    <div className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm backdrop-blur-sm dark:bg-slate-950/60">
+                    <div className="rounded-2xl border border-slate-700/70 bg-slate-950/90 p-4 text-slate-100 shadow-lg shadow-black/20 backdrop-blur-sm">
                       {selectedEvaluatorDetails ? (
                         <div className="space-y-4">
                           <div>
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Selected Evaluator</p>
-                            <h3 className="mt-1 text-xl font-semibold text-foreground">{selectedEvaluatorDetails.name}</h3>
-                            <p className="text-sm text-muted-foreground break-all">{selectedEvaluatorDetails.email}</p>
+                            <p className="text-xs uppercase tracking-wide text-slate-400">Selected Evaluator</p>
+                            <h3 className="mt-1 text-xl font-semibold text-white">{selectedEvaluatorDetails.name}</h3>
+                            <p className="text-sm text-slate-300 break-all">{selectedEvaluatorDetails.email}</p>
                           </div>
 
                           <div className="flex flex-wrap gap-2">
-                            <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                            <span className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">
                               Role: {selectedEvaluatorDetails.role}
                             </span>
-                            <span className="inline-flex items-center rounded-full border border-slate-500/30 bg-slate-500/10 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            <span className="inline-flex items-center rounded-full border border-slate-500/40 bg-slate-800/70 px-3 py-1 text-xs font-semibold text-slate-200">
                               Registered evaluator
                             </span>
                           </div>
@@ -627,15 +717,38 @@ function SupervisorDashboard() {
                             </Button>
                             <Button
                               variant="outline"
-                              onClick={() => setSelectedEvaluator(null)}
+                              onClick={clearEvaluatorFilter}
+                            >
+                              Clear Selection
+                            </Button>
+                          </div>
+                        </div>
+                      ) : selectedEvaluator ? (
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-slate-400">Selected Evaluator</p>
+                            <h3 className="mt-1 text-xl font-semibold text-white">{selectedEvaluatorLabel}</h3>
+                            <p className="text-sm text-slate-300 break-all">{String(selectedEvaluator)}</p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant="default"
+                              onClick={() => handleViewSelectedEvaluatorEvaluations(String(selectedEvaluator))}
+                            >
+                              View Evaluations
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={clearEvaluatorFilter}
                             >
                               Clear Selection
                             </Button>
                           </div>
                         </div>
                       ) : (
-                        <div className="flex h-full min-h-[168px] items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center text-sm text-muted-foreground">
-                          Pick an evaluator from the dropdown to show their email, role, and evaluations link here.
+                        <div className="flex min-h-[168px] items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center text-sm text-muted-foreground">
+                          Pick an evaluator from the searchable picker to show their email, role, and evaluations link here.
                         </div>
                       )}
                     </div>
