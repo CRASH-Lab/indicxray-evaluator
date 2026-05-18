@@ -36,7 +36,7 @@ import {
   adminGetAllEvaluatorEvaluations,
   adminGetStage2Stats
 } from '@/services'
-import { Loader2 } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Copy, Loader2, TriangleAlert } from 'lucide-react'
 
 // Type definitions for better type safety
 interface Evaluator {
@@ -339,6 +339,106 @@ function SupervisorDashboard() {
     return "text-red-500 font-bold"
   }
 
+  const getScoreBadge = (score: number): { label: string; className: string } => {
+    if (score >= 1) {
+      return {
+        label: 'Concordant',
+        className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+      }
+    }
+
+    return {
+      label: 'Divergent',
+      className: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300',
+    }
+  }
+
+  const getCaseDisplayName = (caseId: string, index: number, caseImageId?: string): string => {
+    const candidate = caseImageId?.trim()
+
+    if (candidate && candidate.length <= 28 && !candidate.toUpperCase().includes('CASE_')) {
+      return candidate
+    }
+
+    return `Case #${String(index + 1).padStart(3, '0')}`
+  }
+
+  const getModelDisplayName = (modelName: string, ordinal: number): string => {
+    const hasLabel = modelName.trim().length > 0
+    return hasLabel ? `Model ${ordinal + 1}` : `Model ${ordinal + 1}`
+  }
+
+  const copyText = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch (error) {
+      console.warn('Failed to copy text:', error)
+    }
+  }
+
+  const openReviewDetails = (evaluation: Evaluation, caseImageId: string) => {
+    const params = new URLSearchParams({
+      case: evaluation.case_id,
+      evaluator: evaluation.evaluator_id,
+      model: evaluation.model_id,
+      metric: evaluation.metric_id,
+    })
+
+    if (caseImageId) {
+      params.set('caseLabel', caseImageId)
+    }
+
+    navigate(`/supervisor/analysis?${params.toString()}`)
+  }
+
+  const getStage2RowState = (completedCount: number, totalCount: number) => {
+    if (totalCount === 0) {
+      return {
+        label: 'Unassigned',
+        labelClassName: 'border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300',
+        trackClassName: 'bg-slate-800',
+        fillClassName: 'bg-slate-500',
+        fillWidth: 0,
+        rowClassName: 'opacity-70',
+        icon: TriangleAlert,
+      }
+    }
+
+    if (completedCount >= totalCount) {
+      return {
+        label: 'Completed',
+        labelClassName: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+        trackClassName: 'bg-emerald-950/40',
+        fillClassName: 'bg-emerald-500',
+        fillWidth: 100,
+        rowClassName: '',
+        icon: CheckCircle2,
+      }
+    }
+
+    if (completedCount === 0) {
+      return {
+        label: 'Not started',
+        labelClassName: 'border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300',
+        trackClassName: 'bg-slate-800',
+        fillClassName: 'bg-slate-500',
+        fillWidth: 0,
+        rowClassName: '',
+        icon: TriangleAlert,
+      }
+    }
+
+    return {
+      label: 'In progress',
+      labelClassName: 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+      trackClassName: 'bg-slate-800',
+      fillClassName: 'bg-blue-500',
+      fillWidth: (completedCount / totalCount) * 100,
+      rowClassName: '',
+      icon: Loader2,
+    }
+  }
+
   // Format date string safely
   const formatDate = (dateString: string): string => {
     if (!dateString) return 'Invalid Date';
@@ -397,6 +497,24 @@ function SupervisorDashboard() {
 
   const totalPages = Math.max(1, Math.ceil(evaluationsPagination.count / evaluationsPagination.page_size))
   const stage2AssignedCount = stage2Stats?.assigned_images_per_evaluator ?? stage2Stats?.total_images ?? 0
+  const sortedStage2Stats = [...(stage2Stats?.stats ?? [])].sort((left: any, right: any) => {
+    const priority = (stat: any) => {
+      if ((stat.total_count ?? 0) === 0) return 3
+      if ((stat.completed_count ?? 0) >= (stat.total_count ?? 0)) return 0
+      if ((stat.completed_count ?? 0) === 0) return 1
+      return 2
+    }
+
+    const leftPriority = priority(left)
+    const rightPriority = priority(right)
+
+    if (leftPriority !== rightPriority) return leftPriority - rightPriority
+
+    const leftRatio = (left.total_count ?? 0) === 0 ? -1 : left.completed_count / left.total_count
+    const rightRatio = (right.total_count ?? 0) === 0 ? -1 : right.completed_count / right.total_count
+
+    return leftRatio - rightRatio
+  })
 
   return (
     <div className="container mx-auto py-8">
