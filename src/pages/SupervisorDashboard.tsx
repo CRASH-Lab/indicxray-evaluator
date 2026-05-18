@@ -571,7 +571,8 @@ function SupervisorDashboard() {
     updateDashboardUrl({ tab: 'evaluations', page: nextPage })
   }
 
-  const totalPages = Math.max(1, Math.ceil(evaluationsPagination.count / evaluationsPagination.page_size))
+  const _pageSizeNum = evaluationsPagination.page_size || evaluationsPageSize
+  const totalPages = Math.max(1, Math.ceil((evaluationsPagination.count || 0) / Math.max(1, _pageSizeNum)))
   const stage2AssignedCount = stage2Stats?.assigned_images_per_evaluator ?? stage2Stats?.total_images ?? 0
   const sortedStage2Stats = [...(stage2Stats?.stats ?? [])].sort((left: any, right: any) => {
     const priority = (stat: any) => {
@@ -1122,10 +1123,10 @@ function SupervisorDashboard() {
                               <TableCell>
                                 <div className="space-y-1">
                                   <div className="font-medium text-foreground">
-                                    {getModelDisplayName(evaluation.model_name || 'Unknown', modelIndex >= 0 ? modelIndex : 0)}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground font-mono break-all">
-                                    {evaluation.model_name || 'Unknown'}
+                                    {(evaluation.model_name && String(evaluation.model_name).trim().length > 0)
+                                      ? String(evaluation.model_name)
+                                      : getModelDisplayName('Unknown', modelIndex >= 0 ? modelIndex : 0)
+                                    }
                                   </div>
                                 </div>
                               </TableCell>
@@ -1162,8 +1163,8 @@ function SupervisorDashboard() {
                       const page = Math.max(1, evaluationsPagination.page || 1)
                       const pageSize = evaluationsPagination.page_size || evaluationsPageSize
                       const total = Math.max(0, evaluationsPagination.count || 0)
-                      const from = Math.min(total, ((page - 1) * pageSize) + 1)
-                      const to = Math.min(total, ((page - 1) * pageSize) + filteredAndSortedEvaluations.length)
+                      const from = total === 0 ? 0 : ((page - 1) * pageSize) + 1
+                      const to = Math.min(total, page * pageSize)
                       return `Showing ${from}-${to} of ${total} evaluations`
                     })()}
                   </div>
