@@ -22,6 +22,13 @@ import {
   TabsList, 
   TabsTrigger 
 } from '@/components/ui/tabs'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { 
   Accordion,
   AccordionContent,
@@ -115,6 +122,8 @@ function SupervisorDashboard() {
     stage2: true
   })
   const [error, setError] = useState('')
+
+  const selectedEvaluatorDetails = evaluators.find((evaluator) => evaluator.id === selectedEvaluator) || null
 
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab') || 'evaluations'
@@ -456,7 +465,11 @@ function SupervisorDashboard() {
     updateDashboardUrl({ tab: nextTab })
   }
 
-  const handleSelectEvaluator = (evaluatorId: string) => {
+  const handleEvaluatorSelect = (evaluatorId: string) => {
+    setSelectedEvaluator(evaluatorId)
+  }
+
+  const handleViewSelectedEvaluatorEvaluations = (evaluatorId: string) => {
     setEvaluationsPage(1)
     setSelectedEvaluator(evaluatorId)
     setActiveTab('evaluations')
@@ -525,7 +538,7 @@ function SupervisorDashboard() {
               </Button>
               <Button variant="default" onClick={() => navigate('/supervisor/users')}>
                 Manage Users
-              </Button>
+                              onClick={() => handleViewSelectedEvaluatorEvaluations(evaluator.id)}
               <Button variant="outline" onClick={handleLogout}>Log out</Button>            </div>
           </div>
         </CardHeader>
@@ -543,48 +556,89 @@ function SupervisorDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Evaluators</CardTitle>
-              <CardDescription>All doctors who can evaluate cases</CardDescription>
+              <CardDescription>Choose a registered evaluator from the dropdown to review their details or open their evaluations.</CardDescription>
             </CardHeader>
             <CardContent>
               {loading.evaluators ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
+              ) : evaluators.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center text-muted-foreground">
+                  No evaluators found.
+                </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {evaluators.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center">No evaluators found</TableCell>
-                      </TableRow>
-                    ) : (
-                      evaluators.map(evaluator => (
-                        <TableRow key={evaluator.id}>
-                          <TableCell>{evaluator.name}</TableCell>
-                          <TableCell>{evaluator.email}</TableCell>
-                          <TableCell>{evaluator.role}</TableCell>
-                          <TableCell>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleSelectEvaluator(evaluator.id)}
+                <div className="space-y-6">
+                  <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                    <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-slate-900/90 via-slate-900 to-slate-800/80 p-4 shadow-sm">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-white">Registered Evaluators</p>
+                          <p className="text-xs text-slate-400">Select one profile to reveal the evaluator summary below.</p>
+                        </div>
+                        <span className="rounded-full border border-slate-700/70 bg-slate-800/70 px-3 py-1 text-xs font-semibold text-slate-200">
+                          {evaluators.length} total
+                        </span>
+                      </div>
+
+                      <Select value={selectedEvaluator ?? undefined} onValueChange={handleEvaluatorSelect}>
+                        <SelectTrigger className="h-12 border-slate-700 bg-slate-950/70 text-left text-white shadow-inner shadow-black/20">
+                          <SelectValue placeholder="Choose an evaluator" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {evaluators.map((evaluator) => (
+                            <SelectItem key={evaluator.id} value={evaluator.id}>
+                              <div className="flex flex-col text-left">
+                                <span className="font-medium">{evaluator.name}</span>
+                                <span className="text-xs text-muted-foreground">{evaluator.email}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="rounded-2xl border border-border/60 bg-white/70 p-4 shadow-sm backdrop-blur-sm dark:bg-slate-950/60">
+                      {selectedEvaluatorDetails ? (
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Selected Evaluator</p>
+                            <h3 className="mt-1 text-xl font-semibold text-foreground">{selectedEvaluatorDetails.name}</h3>
+                            <p className="text-sm text-muted-foreground break-all">{selectedEvaluatorDetails.email}</p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                              Role: {selectedEvaluatorDetails.role}
+                            </span>
+                            <span className="inline-flex items-center rounded-full border border-slate-500/30 bg-slate-500/10 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                              Registered evaluator
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant="default"
+                              onClick={() => handleViewSelectedEvaluatorEvaluations(selectedEvaluatorDetails.id)}
                             >
                               View Evaluations
                             </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                            <Button
+                              variant="outline"
+                              onClick={() => setSelectedEvaluator(null)}
+                            >
+                              Clear Selection
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex h-full min-h-[168px] items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center text-sm text-muted-foreground">
+                          Pick an evaluator from the dropdown to show their email, role, and evaluations link here.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
