@@ -132,7 +132,7 @@ function SupervisorDashboard() {
     if (evaluatorFromUrl !== selectedEvaluator) {
       setSelectedEvaluator(evaluatorFromUrl)
     }
-  }, [searchParams])
+  }, [searchParams, activeTab, evaluationsPage, selectedEvaluator])
 
   const updateDashboardUrl = (nextState: {
     tab?: string;
@@ -646,8 +646,9 @@ function SupervisorDashboard() {
                     }
                     return (
                       <Accordion type="single" collapsible className="w-full">
-                        {Object.entries(batchEvaluations).map(([caseId, caseEvaluations]) => {
+                        {Object.entries(batchEvaluations).map(([caseId, caseEvaluations], caseIndex) => {
                           const caseDetails = getCaseDetails(caseId)
+                          const sortedModels = Array.from(new Set(caseEvaluations.map(evaluation => evaluation.model_id)))
                           const modelGroups = caseEvaluations.reduce((acc, evaluation) => {
                             if (!acc[evaluation.model_id]) acc[evaluation.model_id] = []
                             acc[evaluation.model_id].push(evaluation)
@@ -657,8 +658,15 @@ function SupervisorDashboard() {
                           return (
                             <AccordionItem key={caseId} value={caseId}>
                               <AccordionTrigger className="hover:bg-gray-50 px-4 rounded">
-                                <div className="flex items-center justify-between w-full">
-                                  <span>Case: {caseDetails.image_id}</span>
+                                <div className="flex items-center justify-between w-full gap-4">
+                                  <div className="text-left">
+                                    <div className="font-medium text-foreground">
+                                      {getCaseDisplayName(caseId, caseIndex, caseDetails.image_id)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground font-mono break-all">
+                                      ID: {caseId}
+                                    </div>
+                                  </div>
                                   <span className="text-sm text-gray-500">
                                     {caseEvaluations.length} evaluations
                                   </span>
@@ -666,11 +674,19 @@ function SupervisorDashboard() {
                               </AccordionTrigger>
                               <AccordionContent>
                                 <div className="pt-2 pb-4 px-4">
-                                  {Object.entries(modelGroups).map(([modelId, modelEvals]) => (
+                                  {Object.entries(modelGroups).map(([modelId, modelEvals]) => {
+                                    const modelIndex = sortedModels.indexOf(modelId)
+
+                                    return (
                                     <div key={modelId} className="mb-6 border rounded-lg p-4">
-                                      <h4 className="font-medium text-lg mb-3">
-                                        Model: {modelEvals[0]?.model_name || 'Unknown Model'}
-                                      </h4>
+                                      <div className="mb-3">
+                                        <h4 className="font-medium text-lg text-foreground">
+                                          {getModelDisplayName(modelEvals[0]?.model_name || 'Unknown Model', modelIndex >= 0 ? modelIndex : 0)}
+                                        </h4>
+                                        <p className="text-xs text-muted-foreground font-mono break-all">
+                                          {modelEvals[0]?.model_name || 'Unknown Model'}
+                                        </p>
+                                      </div>
                                       <Table>
                                         <TableHeader>
                                           <TableRow>
@@ -683,8 +699,15 @@ function SupervisorDashboard() {
                                           {modelEvals.map(evaluation => (
                                             <TableRow key={evaluation.id}>
                                               <TableCell>{getMetricName(evaluation.metric_id, evaluation.metric_name)}</TableCell>
-                                              <TableCell className={getScoreColor(evaluation.score)}>
-                                                {evaluation.score}
+                                              <TableCell>
+                                                {(() => {
+                                                  const badge = getScoreBadge(evaluation.score)
+                                                  return (
+                                                    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${badge.className}`}>
+                                                      {badge.label}
+                                                    </span>
+                                                  )
+                                                })()}
                                               </TableCell>
                                               <TableCell>{formatDate(evaluation.created_at)}</TableCell>
                                             </TableRow>
@@ -692,7 +715,8 @@ function SupervisorDashboard() {
                                         </TableBody>
                                       </Table>
                                     </div>
-                                  ))}
+                                    )
+                                  })}
                                 </div>
                               </AccordionContent>
                             </AccordionItem>
@@ -730,28 +754,72 @@ function SupervisorDashboard() {
                       <TableHead>Evaluator</TableHead>
                       <TableHead>Model</TableHead>
                       <TableHead>Metric</TableHead>
-                      <TableHead>Score</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {evaluations.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center">No evaluations found</TableCell>
+                        <TableCell colSpan={7} className="text-center">No evaluations found</TableCell>
                       </TableRow>
                     ) : (
-                      evaluations.map(evaluation => {
+                      evaluations.map((evaluation, index) => {
                         const caseDetails = getCaseDetails(evaluation.case_id);
+                        const scoreBadge = getScoreBadge(evaluation.score)
+                        const modelIndex = evaluations
+                          .filter(item => item.case_id === evaluation.case_id)
+                          .findIndex(item => item.model_id === evaluation.model_id)
                         return (
                           <TableRow key={evaluation.id}>
-                            <TableCell>{caseDetails.image_id}</TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-foreground">
+                                    {getCaseDisplayName(evaluation.case_id, index, caseDetails.image_id)}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                    onClick={() => void copyText(evaluation.case_id)}
+                                    aria-label="Copy case ID"
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                <p className="text-xs text-muted-foreground font-mono break-all">{evaluation.case_id}</p>
+                              </div>
+                            </TableCell>
                             <TableCell>{getEvaluatorName(evaluation.evaluator_id)}</TableCell>
-                            <TableCell>{evaluation.model_name || 'Unknown'}</TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <div className="font-medium text-foreground">
+                                  {getModelDisplayName(evaluation.model_name || 'Unknown', modelIndex >= 0 ? modelIndex : 0)}
+                                </div>
+                                <div className="text-xs text-muted-foreground font-mono break-all">
+                                  {evaluation.model_name || 'Unknown'}
+                                </div>
+                              </div>
+                            </TableCell>
                             <TableCell>{getMetricName(evaluation.metric_id, evaluation.metric_name)}</TableCell>
-                            <TableCell className={getScoreColor(evaluation.score)}>
-                              {evaluation.score}
+                            <TableCell>
+                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${scoreBadge.className}`}>
+                                {scoreBadge.label}
+                              </span>
                             </TableCell>
                             <TableCell>{formatDate(evaluation.created_at)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant={evaluation.score === 0 ? 'destructive' : 'outline'}
+                                size="sm"
+                                onClick={() => openReviewDetails(evaluation, caseDetails.image_id)}
+                              >
+                                {evaluation.score === 0 ? 'Review Details' : 'Open Analysis'}
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         );
                       })
@@ -810,37 +878,55 @@ function SupervisorDashboard() {
                                  <TableRow>
                                      <TableHead>Evaluator</TableHead>
                                      <TableHead>Email</TableHead>
-                                     <TableHead>Completed</TableHead>
+                           <TableHead>Progress</TableHead>
                                      <TableHead>Current Progress</TableHead>
                                  </TableRow>
                              </TableHeader>
                              <TableBody>
-                                 {stage2Stats?.stats?.length === 0 ? (
+                         {sortedStage2Stats.length === 0 ? (
                                      <TableRow>
                                          <TableCell colSpan={4} className="text-center">No evaluator data found</TableCell>
                                      </TableRow>
                                  ) : (
-                                     stage2Stats?.stats?.map((stat: any) => (
-                                         <TableRow key={stat.evaluator_id}>
-                                             <TableCell className="font-medium">{stat.evaluator_name}</TableCell>
-                                             <TableCell>{stat.email}</TableCell>
-                                             <TableCell>
-                                                 <div className="flex items-center gap-2">
-                                                     <span className={stat.completed_count === stat.total_count ?("text-green-600 font-bold") : ""}>
-                                                         {stat.completed_count} / {stat.total_count}
-                                                     </span>
-                                                 </div>
-                                             </TableCell>
-                                             <TableCell>
-                                                 <div className="w-[100px] h-2 bg-gray-200 rounded-full overflow-hidden">
-                                                     <div 
-                                                         className={`h-full ${stat.completed_count === stat.total_count ? 'bg-green-500' : 'bg-blue-500'}`} 
-                                                         style={{ width: `${stat.progress_percentage}%` }}
-                                                     />
-                                                 </div>
-                                             </TableCell>
-                                         </TableRow>
-                                     ))
+                           sortedStage2Stats.map((stat: any) => {
+                             const rowState = getStage2RowState(stat.completed_count ?? 0, stat.total_count ?? 0)
+                             const StatusIcon = rowState.icon
+
+                             return (
+                             <TableRow key={stat.evaluator_id} className={rowState.rowClassName}>
+                               <TableCell className="font-medium">{stat.evaluator_name}</TableCell>
+                               <TableCell>{stat.email}</TableCell>
+                               <TableCell>
+                                 <div className="space-y-2">
+                                   <div className="flex items-center justify-between gap-3">
+                                     <span className="text-sm font-semibold text-foreground">
+                                       {stat.total_count === 0 ? 'Unassigned' : `${stat.completed_count} / ${stat.total_count}`}
+                                     </span>
+                                     <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${rowState.labelClassName}`}>
+                                       <StatusIcon className={`h-3.5 w-3.5 ${rowState.label === 'In progress' ? 'animate-spin' : ''}`} />
+                                       {rowState.label}
+                                     </span>
+                                   </div>
+                                   <div className={`h-3 overflow-hidden rounded-full ${rowState.trackClassName}`}>
+                                     <div 
+                                       className={`h-full rounded-full ${rowState.fillClassName} transition-all duration-300`} 
+                                       style={{ width: `${rowState.fillWidth}%` }}
+                                     />
+                                   </div>
+                                 </div>
+                               </TableCell>
+                               <TableCell>
+                                 <div className="text-sm text-muted-foreground">
+                                   {stat.total_count === 0
+                                     ? 'No Stage 2 images assigned to this evaluator.'
+                                     : stat.completed_count === stat.total_count
+                                     ? 'All assigned images are complete.'
+                                     : `${stat.total_count - stat.completed_count} images still need attention.`}
+                                 </div>
+                               </TableCell>
+                             </TableRow>
+                             )
+                           })
                                  )}
                              </TableBody>
                          </Table>
