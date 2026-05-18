@@ -333,12 +333,6 @@ function SupervisorDashboard() {
     return `Metric ${metricId.slice(0, 8)}`;
   }
 
-  // Get color based on score value
-  const getScoreColor = (score: number): string => {
-    if (score >= 1) return "text-green-500 font-bold"
-    return "text-red-500 font-bold"
-  }
-
   const getScoreBadge = (score: number): { label: string; className: string } => {
     if (score >= 1) {
       return {
