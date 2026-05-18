@@ -122,8 +122,9 @@ function SupervisorDashboard() {
     stage2: true
   })
   const [error, setError] = useState('')
-
-  const selectedEvaluatorDetails = evaluators.find((evaluator) => evaluator.id === selectedEvaluator) || null
+  const selectedEvaluatorDetails = selectedEvaluator
+    ? evaluators.find((evaluator) => evaluator.id === selectedEvaluator) || null
+    : null
 
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab') || 'evaluations'
@@ -538,8 +539,9 @@ function SupervisorDashboard() {
               </Button>
               <Button variant="default" onClick={() => navigate('/supervisor/users')}>
                 Manage Users
-                              onClick={() => handleViewSelectedEvaluatorEvaluations(evaluator.id)}
-              <Button variant="outline" onClick={handleLogout}>Log out</Button>            </div>
+              </Button>
+              <Button variant="outline" onClick={handleLogout}>Log out</Button>
+            </div>
           </div>
         </CardHeader>
       </Card>
@@ -698,7 +700,6 @@ function SupervisorDashboard() {
                           const caseDetails = getCaseDetails(caseId)
                           const sortedModels = Array.from(new Set(caseEvaluations.map(evaluation => evaluation.model_id)))
                           const completedMetrics = caseEvaluations.filter(evaluation => evaluation.score >= 1).length
-                          const hasIncompleteMetrics = completedMetrics < caseEvaluations.length
                           const caseStatusLabel = caseEvaluations.length === 0
                             ? 'No Metrics'
                             : completedMetrics === caseEvaluations.length
