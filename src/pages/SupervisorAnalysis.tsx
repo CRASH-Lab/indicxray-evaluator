@@ -1,10 +1,28 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { Download, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { adminRunReliabilityReport } from '@/services'
+import {
+  downloadCsv,
+  downloadWorkbook,
+  filterSheetsByColumns,
+  flattenSheetsForCsv,
+  getCsvColumns,
+  makeReportFilename,
+  reliabilityReportSheets,
+} from '@/lib/reportExports'
 
 type ReliabilityStats = {
   n: number
@@ -50,6 +68,11 @@ function SupervisorAnalysis() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [report, setReport] = useState<ReliabilityResponse | null>(null)
+  const [analysisExportColumns, setAnalysisExportColumns] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    setAnalysisExportColumns(null)
+  }, [report])
 
   const runAnalysis = async () => {
     setLoading(true)
@@ -65,6 +88,77 @@ function SupervisorAnalysis() {
     }
   }
 
+  const handleSaveCsv = () => {
+    if (!report) return
+    const sheets = reliabilityReportSheets(report, MODEL_NAME_MAP)
+    const columns = analysisExportColumns ?? getCsvColumns(sheets)
+    downloadCsv(makeReportFilename(['analysis-report'], 'csv'), flattenSheetsForCsv(sheets, columns))
+  }
+
+  const handleSaveExcel = () => {
+    if (!report) return
+    const sheets = reliabilityReportSheets(report, MODEL_NAME_MAP)
+    const columns = analysisExportColumns ?? getCsvColumns(sheets)
+    downloadWorkbook(makeReportFilename(['analysis-report'], 'xlsx'), filterSheetsByColumns(sheets, columns))
+  }
+
+  const renderAnalysisExportMenu = (format: 'csv' | 'excel') => {
+    if (!report) return null
+
+    const sheets = reliabilityReportSheets(report, MODEL_NAME_MAP)
+    const columns = getCsvColumns(sheets)
+    const activeColumns = analysisExportColumns ?? columns
+    const activeColumnSet = new Set(activeColumns)
+    const isCsv = format === 'csv'
+
+    const toggleColumn = (column: string, checked: boolean) => {
+      const nextColumns = checked
+        ? Array.from(new Set([...activeColumns, column]))
+        : activeColumns.filter((item) => item !== column)
+      setAnalysisExportColumns(nextColumns.length === columns.length ? null : nextColumns)
+    }
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Save {isCsv ? 'CSV' : 'Excel'}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="max-h-96 w-72 overflow-y-auto">
+          <DropdownMenuLabel>Columns to export</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={activeColumns.length === 0}
+            onClick={isCsv ? handleSaveCsv : handleSaveExcel}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download {isCsv ? 'CSV' : 'Excel'} ({activeColumns.length}/{columns.length})
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setAnalysisExportColumns(null)}>
+            Select all
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setAnalysisExportColumns([])}>
+            Clear all
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {columns.map((column) => (
+            <DropdownMenuCheckboxItem
+              key={column}
+              checked={activeColumnSet.has(column)}
+              onCheckedChange={(checked) => toggleColumn(column, Boolean(checked))}
+              onSelect={(event) => event.preventDefault()}
+            >
+              {column}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
   return (
     <div className="container mx-auto py-8">
       <Card className="mb-6">
@@ -77,6 +171,12 @@ function SupervisorAnalysis() {
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              {report && (
+                <>
+                  {renderAnalysisExportMenu('csv')}
+                  {renderAnalysisExportMenu('excel')}
+                </>
+              )}
               <Button onClick={runAnalysis} disabled={loading}>
                 {loading ? (
                   <>

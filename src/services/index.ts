@@ -567,15 +567,37 @@ async function adminGetAllEvaluatorEvaluations(evaluatorId: string) {
       metric_id: string;
       metric_name: string;
       evaluator_id: string;
+      evaluator_name?: string;
+      evaluator_group?: string;
       case_id: string;
       is_cross_assigned: boolean;
       model_id: string;
       model_name: string;
+      peer_evaluator_id?: string | null;
+      peer_evaluator_name?: string | null;
+      peer_evaluator_group?: string | null;
+      peer_score?: number | null;
+      agreement_status?: 'concordant' | 'divergent' | 'pending' | 'unpaired';
       created_at: string;
     }>;
   } catch (error) {
     console.error("Error fetching all evaluations for evaluator:", error);
     return [];
+  }
+}
+
+async function adminGetEvaluatorInterraterSummary(
+  evaluatorId: string,
+  assignmentType: 'all' | 'original' | 'cross' = 'all',
+) {
+  try {
+    const response = await instance.get(`admin/evaluator/${evaluatorId}/interrater-summary/`, {
+      params: { assignment_type: assignmentType },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching evaluator interrater summary:", error);
+    return null;
   }
 }
 
@@ -664,6 +686,7 @@ export {
   adminGetAssignments,
   adminGetEvaluations,
   adminGetAllEvaluatorEvaluations,
+  adminGetEvaluatorInterraterSummary,
   getStage2Images,
   saveStage2Evaluation,
   adminGetStage2Stats,

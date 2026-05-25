@@ -35,6 +35,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { 
   Accordion,
   AccordionContent,
@@ -56,9 +65,19 @@ import {
   adminGetAssignments,
   adminGetEvaluations,
   adminGetAllEvaluatorEvaluations,
+  adminGetEvaluatorInterraterSummary,
   adminGetStage2Stats
 } from '@/services'
-import { ArrowRight, CheckCircle2, Copy, Loader2, TriangleAlert } from 'lucide-react'
+import {
+  downloadCsv,
+  downloadWorkbook,
+  filterSheetsByColumns,
+  flattenSheetsForCsv,
+  getCsvColumns,
+  interraterSummarySheets,
+  makeReportFilename,
+} from '@/lib/reportExports'
+import { ArrowRight, CheckCircle2, Copy, Download, Loader2, TriangleAlert } from 'lucide-react'
 
 // Type definitions for better type safety
 interface Evaluator {
@@ -77,6 +96,11 @@ interface Evaluation {
   metric_id: string;
   metric_name?: string;
   score: number;
+  evaluator_name?: string;
+  peer_evaluator_id?: string | null;
+  peer_evaluator_name?: string | null;
+  peer_score?: number | null;
+  agreement_status?: 'concordant' | 'divergent' | 'pending' | 'unpaired';
   created_at: string;
 }
 
@@ -100,6 +124,86 @@ interface Metric {
   description?: string;
 }
 
+interface AgreementStats {
+  n: number;
+  percent_agreement: number | null;
+  cohen_kappa: number | null;
+  weighted_kappa: number | null;
+  icc_2_1: number | null;
+  pabak: number | null;
+  prevalence_index: number | null;
+  bias_index: number | null;
+  gwet_ac1: number | null;
+}
+
+interface InterraterSummary {
+  overall: AgreementStats & {
+    paired_cases: number;
+    expected_pairs: number;
+    overlap_completed: number;
+    selected_completed: number;
+    opposite_completed: number;
+    missing_selected: number;
+    missing_opposite: number;
+    concordant: number;
+    divergent: number;
+  };
+  by_case: Array<AgreementStats & {
+    case_id: string;
+    selected_reviewer: string;
+    opposite_reviewer: string;
+    expected_pairs: number;
+    overlap_completed: number;
+    selected_completed: number;
+    opposite_completed: number;
+    missing_selected: number;
+    missing_opposite: number;
+    concordant: number;
+    divergent: number;
+  }>;
+  by_metric: Array<AgreementStats & {
+    metric_id: string;
+    metric_name: string;
+    concordant: number;
+    divergent: number;
+  }>;
+  by_model: Array<AgreementStats & {
+    model_name: string;
+    concordant: number;
+    divergent: number;
+  }>;
+  by_pair: Array<AgreementStats & {
+    opposite_reviewer_id: string;
+    opposite_reviewer_name: string;
+    opposite_reviewer_email?: string;
+    opposite_reviewer_group?: string;
+    paired_cases: number;
+    expected_pairs: number;
+    overlap_completed: number;
+    selected_completed: number;
+    opposite_completed: number;
+    missing_selected: number;
+    missing_opposite: number;
+    concordant: number;
+    divergent: number;
+    cases: Array<AgreementStats & {
+      case_id: string;
+      selected_reviewer: string;
+      opposite_reviewer: string;
+      expected_pairs: number;
+      overlap_completed: number;
+      selected_completed: number;
+      opposite_completed: number;
+      missing_selected: number;
+      missing_opposite: number;
+      concordant: number;
+      divergent: number;
+    }>;
+  }>;
+  assignment_type: 'all' | 'original' | 'cross';
+  generated_at: string;
+}
+
 function SupervisorDashboard() {
   const { supervisorId } = useParams()
   const navigate = useNavigate()
@@ -114,11 +218,13 @@ function SupervisorDashboard() {
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [cases, setCases] = useState<Case[]>([])
   const [evaluatorEvaluations, setEvaluatorEvaluations] = useState<(Evaluation & { is_cross_assigned: boolean })[]>([])
+  const [interraterSummary, setInterraterSummary] = useState<InterraterSummary | null>(null)
   const [metrics, setMetrics] = useState<Metric[]>([])
   const [stage2Stats, setStage2Stats] = useState<any>(null)
   const [selectedEvaluator, setSelectedEvaluator] = useState<string | null>(initialEvaluator)
   const [evaluatorPickerOpen, setEvaluatorPickerOpen] = useState(false)
   const [caseTab, setCaseTab] = useState<'original' | 'cross'>('original')
+  const [interraterExportColumns, setInterraterExportColumns] = useState<string[] | null>(null)
   const [evaluationsPage, setEvaluationsPage] = useState(initialPage)
   const [evaluationsPageSize] = useState(100)
   const [evaluationsQuery, setEvaluationsQuery] = useState('')
@@ -138,6 +244,7 @@ function SupervisorDashboard() {
     cases: true,
     metrics: true,
     evaluatorEvaluations: false,
+    interraterSummary: false,
     stage2: true
   })
   const [error, setError] = useState('')
@@ -279,6 +386,7 @@ function SupervisorDashboard() {
           cases: false,
           metrics: false,
           evaluatorEvaluations: false,
+          interraterSummary: false,
           stage2: false
         })
       }
@@ -341,6 +449,42 @@ function SupervisorDashboard() {
 
     fetchEvaluatorEvaluations()
   }, [selectedEvaluator])
+
+  useEffect(() => {
+    setInterraterExportColumns(null)
+  }, [selectedEvaluator, caseTab])
+
+  useEffect(() => {
+    if (!selectedEvaluator) {
+      setInterraterSummary(null)
+      return
+    }
+
+    let mounted = true
+
+    async function fetchInterraterSummary() {
+      try {
+        setInterraterSummary(null)
+        setLoading(prev => ({ ...prev, interraterSummary: true }))
+        const data = await adminGetEvaluatorInterraterSummary(selectedEvaluator!, caseTab)
+        if (mounted) {
+          setInterraterSummary(data as InterraterSummary | null)
+        }
+      } catch (err) {
+        console.error('Error fetching interrater summary:', err)
+      } finally {
+        if (mounted) {
+          setLoading(prev => ({ ...prev, interraterSummary: false }))
+        }
+      }
+    }
+
+    fetchInterraterSummary()
+
+    return () => {
+      mounted = false
+    }
+  }, [selectedEvaluator, caseTab])
   
   // Add a utility method to load case details if needed
   const fetchCaseDetailIfNeeded = async (caseId: string) => {
@@ -411,14 +555,53 @@ function SupervisorDashboard() {
   const getScoreBadge = (score: number): { label: string; className: string } => {
     if (score >= 1) {
       return {
-        label: 'Concordant',
+        label: '1',
         className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
       }
     }
 
     return {
-      label: 'Divergent',
+      label: '0',
       className: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300',
+    }
+  }
+
+  const getAgreementBadge = (status?: Evaluation['agreement_status']): { label: string; className: string } => {
+    if (status === 'concordant') {
+      return {
+        label: 'Concordant',
+        className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+      }
+    }
+
+    if (status === 'divergent') {
+      return {
+        label: 'Divergent',
+        className: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300',
+      }
+    }
+
+    if (status === 'pending') {
+      return {
+        label: 'Pending',
+        className: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+      }
+    }
+
+    return {
+      label: 'Unpaired',
+      className: 'border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300',
+    }
+  }
+
+  const getPeerScoreBadge = (score?: number | null): { label: string; className: string } => {
+    if (score === 0 || score === 1) {
+      return getScoreBadge(score)
+    }
+
+    return {
+      label: '-',
+      className: 'border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300',
     }
   }
 
@@ -519,6 +702,121 @@ function SupervisorDashboard() {
       return 'Invalid Date';
     }
   }
+
+  const formatStat = (value: number | null | undefined, digits = 3): string => {
+    if (value === null || value === undefined || Number.isNaN(value)) return '-'
+    return value.toFixed(digits)
+  }
+
+  const formatPercent = (value: number | null | undefined): string => {
+    if (value === null || value === undefined || Number.isNaN(value)) return '-'
+    return `${value.toFixed(1)}%`
+  }
+
+  const getCompletionPercent = (completed: number, total: number): number => {
+    if (!total) return 0
+    return Math.max(0, Math.min(100, (completed / total) * 100))
+  }
+
+  const getCaseInterraterSummary = (caseId: string) => {
+    return interraterSummary?.by_case.find((item) => item.case_id === caseId) || null
+  }
+
+  const renderSummaryMetric = (label: string, value: string | number) => (
+    <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
+    </div>
+  )
+
+  const getInterraterExportSheets = () => {
+    if (!interraterSummary) return []
+    return interraterSummarySheets(
+      interraterSummary,
+      evaluatorEvaluations,
+      selectedEvaluatorLabel || 'Selected evaluator',
+      caseTab
+    )
+  }
+
+  const getActiveInterraterExportColumns = (sheets = getInterraterExportSheets()) => {
+    const columns = getCsvColumns(sheets)
+    return interraterExportColumns ?? columns
+  }
+
+  const handleExportInterraterCsv = () => {
+    const sheets = getInterraterExportSheets()
+    const columns = getActiveInterraterExportColumns(sheets)
+    downloadCsv(
+      makeReportFilename(['interrater', selectedEvaluatorLabel || selectedEvaluator, caseTab], 'csv'),
+      flattenSheetsForCsv(sheets, columns)
+    )
+  }
+
+  const handleExportInterraterExcel = () => {
+    const sheets = getInterraterExportSheets()
+    const columns = getActiveInterraterExportColumns(sheets)
+    downloadWorkbook(
+      makeReportFilename(['interrater', selectedEvaluatorLabel || selectedEvaluator, caseTab], 'xlsx'),
+      filterSheetsByColumns(sheets, columns)
+    )
+  }
+
+  const renderInterraterExportMenu = (format: 'csv' | 'excel') => {
+    const sheets = getInterraterExportSheets()
+    const columns = getCsvColumns(sheets)
+    const activeColumns = getActiveInterraterExportColumns(sheets)
+    const activeColumnSet = new Set(activeColumns)
+    const isCsv = format === 'csv'
+
+    const toggleColumn = (column: string, checked: boolean) => {
+      const nextColumns = checked
+        ? Array.from(new Set([...activeColumns, column]))
+        : activeColumns.filter((item) => item !== column)
+      setInterraterExportColumns(nextColumns.length === columns.length ? null : nextColumns)
+    }
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Download className="mr-2 h-4 w-4" />
+            Export {isCsv ? 'CSV' : 'Excel'}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="max-h-96 w-72 overflow-y-auto">
+          <DropdownMenuLabel>Columns to export</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={activeColumns.length === 0}
+            onClick={isCsv ? handleExportInterraterCsv : handleExportInterraterExcel}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Download {isCsv ? 'CSV' : 'Excel'} ({activeColumns.length}/{columns.length})
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setInterraterExportColumns(null)}>
+            Select all
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setInterraterExportColumns([])}>
+            Clear all
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {columns.map((column) => (
+            <DropdownMenuCheckboxItem
+              key={column}
+              checked={activeColumnSet.has(column)}
+              onCheckedChange={(checked) => toggleColumn(column, Boolean(checked))}
+              onSelect={(event) => event.preventDefault()}
+            >
+              {column}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
   function handleLogout() {
     localStorage.removeItem('authToken')
     localStorage.removeItem('userId')
@@ -606,15 +904,21 @@ function SupervisorDashboard() {
       const modelName = getModelDisplayName(evaluation.model_name || 'Unknown', modelIndex >= 0 ? modelIndex : index)
       const metricName = getMetricName(evaluation.metric_id, evaluation.metric_name)
       const scoreLabel = getScoreBadge(evaluation.score).label
+      const peerScoreLabel = getPeerScoreBadge(evaluation.peer_score).label
+      const agreementLabel = getAgreementBadge(evaluation.agreement_status).label
       const statusText = scoreLabel.toLowerCase()
 
       return [
         evaluation.case_id,
         evaluatorName,
+        evaluation.peer_evaluator_name,
+        evaluation.peer_score,
         evaluation.model_name,
         modelName,
         metricName,
         scoreLabel,
+        peerScoreLabel,
+        agreementLabel,
         statusText,
         evaluation.created_at,
       ]
@@ -639,8 +943,8 @@ function SupervisorDashboard() {
       const rightModelName = getModelDisplayName(right.model_name || 'Unknown', rightModelIndex >= 0 ? rightModelIndex : rightCaseIndex)
       const leftMetricName = getMetricName(left.metric_id, left.metric_name)
       const rightMetricName = getMetricName(right.metric_id, right.metric_name)
-      const leftStatus = getScoreBadge(left.score).label
-      const rightStatus = getScoreBadge(right.score).label
+      const leftStatus = getAgreementBadge(left.agreement_status).label
+      const rightStatus = getAgreementBadge(right.agreement_status).label
       const leftDate = new Date(left.created_at).getTime() || 0
       const rightDate = new Date(right.created_at).getTime() || 0
 
@@ -668,6 +972,240 @@ function SupervisorDashboard() {
       modelOrdinalMap[caseId][modelId] = Object.keys(modelOrdinalMap[caseId]).length
     }
   })
+
+  const renderInterraterSummaryPanel = () => {
+    if (!selectedEvaluator) return null
+
+    if (loading.interraterSummary) {
+      return (
+        <Card className="mb-5">
+          <CardContent className="flex items-center gap-2 py-5 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading interrater summary...
+          </CardContent>
+        </Card>
+      )
+    }
+
+    if (!interraterSummary) return null
+
+    const overall = interraterSummary.overall
+    const overlapPercent = getCompletionPercent(overall.overlap_completed, overall.expected_pairs)
+    const selectedPercent = getCompletionPercent(overall.selected_completed, overall.expected_pairs)
+    const oppositePercent = getCompletionPercent(overall.opposite_completed, overall.expected_pairs)
+
+    return (
+      <Card className="mb-5">
+        <CardContent className="p-0">
+          <Accordion type="single" collapsible defaultValue="interrater-summary" className="w-full">
+            <AccordionItem value="interrater-summary" className="border-0">
+              <AccordionTrigger className="px-6 py-5 hover:no-underline">
+                <div className="text-left">
+                  <CardTitle className="text-lg">Interrater Summary</CardTitle>
+                  <CardDescription className="mt-1">
+                    {caseTab === 'original' ? 'Original cases' : 'Cross-assigned cases'} only. Agreement scores use only paired completed ratings; missing ratings affect progress only.
+                  </CardDescription>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-5 px-6 pb-6">
+                  <div className="grid gap-3 md:grid-cols-4">
+                    {renderSummaryMetric('Paired cases', overall.paired_cases)}
+                    {renderSummaryMetric('Paired ratings complete', `${overall.overlap_completed} / ${overall.expected_pairs}`)}
+                    {renderSummaryMetric('Concordant / Divergent', `${overall.concordant} / ${overall.divergent}`)}
+                    {renderSummaryMetric('Agreement', formatPercent(overall.percent_agreement))}
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {[
+                      ['Interrater overlap', overall.overlap_completed, overlapPercent],
+                      ['Selected reviewer', overall.selected_completed, selectedPercent],
+                      ['Opposite reviewer', overall.opposite_completed, oppositePercent],
+                    ].map(([label, completed, percent]) => (
+                      <div key={String(label)} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium">{String(label)}</span>
+                          <span className="text-muted-foreground">{Number(completed)} / {overall.expected_pairs}</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                          <div
+                            className="h-full rounded-full bg-blue-500 transition-all"
+                            style={{ width: `${Number(percent)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-5">
+                    {renderSummaryMetric('Cohen kappa', formatStat(overall.cohen_kappa))}
+                    {renderSummaryMetric('Weighted kappa', formatStat(overall.weighted_kappa))}
+                    {renderSummaryMetric('ICC(2,1)', formatStat(overall.icc_2_1))}
+                    {renderSummaryMetric('PABAK', formatStat(overall.pabak))}
+                    {renderSummaryMetric('Gwet AC1', formatStat(overall.gwet_ac1))}
+                  </div>
+
+                  <div className="rounded-md border">
+                    <div className="border-b px-3 py-2">
+                      <p className="text-sm font-semibold">Pair Review</p>
+                      <p className="text-xs text-muted-foreground">
+                        Opposite reviewers for the active {caseTab === 'original' ? 'Original Cases' : 'Cross-Assigned'} tab.
+                      </p>
+                    </div>
+                    {interraterSummary.by_pair.length === 0 ? (
+                      <p className="px-3 py-4 text-sm text-muted-foreground">No paired reviewer data for this tab.</p>
+                    ) : (
+                      <Accordion type="multiple" className="w-full">
+                        {interraterSummary.by_pair.map((pair) => {
+                          const missingTotal = pair.missing_selected + pair.missing_opposite
+                          const pairCompletion = getCompletionPercent(pair.overlap_completed, pair.expected_pairs)
+                          return (
+                            <AccordionItem key={pair.opposite_reviewer_id} value={pair.opposite_reviewer_id}>
+                              <AccordionTrigger className="px-3 py-3 hover:no-underline">
+                                <div className="grid w-full gap-3 text-left md:grid-cols-[minmax(160px,1fr)_repeat(4,minmax(90px,auto))] md:items-center">
+                                  <div>
+                                    <p className="text-sm font-semibold">{pair.opposite_reviewer_name || 'Unknown reviewer'}</p>
+                                    <p className="text-xs text-muted-foreground">{pair.paired_cases} paired cases</p>
+                                  </div>
+                                  <div className="text-xs">
+                                    <p className="text-muted-foreground">Overlap</p>
+                                    <p className="font-medium">{pair.overlap_completed} / {pair.expected_pairs}</p>
+                                  </div>
+                                  <div className="text-xs">
+                                    <p className="text-muted-foreground">Missing</p>
+                                    <p className="font-medium">{missingTotal}</p>
+                                  </div>
+                                  <div className="text-xs">
+                                    <p className="text-muted-foreground">Agreement</p>
+                                    <p className="font-medium">{formatPercent(pair.percent_agreement)}</p>
+                                  </div>
+                                  <div className="text-xs">
+                                    <p className="text-muted-foreground">PABAK / Gwet</p>
+                                    <p className="font-medium">{formatStat(pair.pabak)} / {formatStat(pair.gwet_ac1)}</p>
+                                  </div>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="space-y-3 px-3 pb-4">
+                                  <div className="grid gap-3 md:grid-cols-4">
+                                    {renderSummaryMetric('Selected complete', `${pair.selected_completed} / ${pair.expected_pairs}`)}
+                                    {renderSummaryMetric('Opposite complete', `${pair.opposite_completed} / ${pair.expected_pairs}`)}
+                                    {renderSummaryMetric('Concordant / Divergent', `${pair.concordant} / ${pair.divergent}`)}
+                                    {renderSummaryMetric('Cohen kappa', formatStat(pair.cohen_kappa))}
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="font-medium">Overlap complete</span>
+                                      <span className="text-muted-foreground">{pair.overlap_completed} / {pair.expected_pairs}</span>
+                                    </div>
+                                    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                                      <div className="h-full rounded-full bg-blue-500" style={{ width: `${pairCompletion}%` }} />
+                                    </div>
+                                  </div>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Case</TableHead>
+                                        <TableHead>Overlap</TableHead>
+                                        <TableHead>Selected</TableHead>
+                                        <TableHead>Opposite</TableHead>
+                                        <TableHead>Missing</TableHead>
+                                        <TableHead>Concordant / Divergent</TableHead>
+                                        <TableHead>Agreement</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {pair.cases.map((caseRow) => (
+                                        <TableRow key={`${pair.opposite_reviewer_id}-${caseRow.case_id}`}>
+                                          <TableCell>{caseRow.case_id}</TableCell>
+                                          <TableCell>{caseRow.overlap_completed} / {caseRow.expected_pairs}</TableCell>
+                                          <TableCell>{caseRow.selected_completed}</TableCell>
+                                          <TableCell>{caseRow.opposite_completed}</TableCell>
+                                          <TableCell>{caseRow.missing_selected + caseRow.missing_opposite}</TableCell>
+                                          <TableCell>{caseRow.concordant} / {caseRow.divergent}</TableCell>
+                                          <TableCell>{formatPercent(caseRow.percent_agreement)}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          )
+                        })}
+                      </Accordion>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-md border">
+                      <div className="border-b px-3 py-2 text-sm font-semibold">By Metric</div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Metric</TableHead>
+                            <TableHead>n</TableHead>
+                            <TableHead>Agreement</TableHead>
+                            <TableHead>PABAK</TableHead>
+                            <TableHead>Gwet</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {interraterSummary.by_metric.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-muted-foreground">No paired metric data</TableCell>
+                            </TableRow>
+                          ) : interraterSummary.by_metric.map((row) => (
+                            <TableRow key={row.metric_id}>
+                              <TableCell>{row.metric_name}</TableCell>
+                              <TableCell>{row.n}</TableCell>
+                              <TableCell>{formatPercent(row.percent_agreement)}</TableCell>
+                              <TableCell>{formatStat(row.pabak)}</TableCell>
+                              <TableCell>{formatStat(row.gwet_ac1)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="rounded-md border">
+                      <div className="border-b px-3 py-2 text-sm font-semibold">By Model</div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Model</TableHead>
+                            <TableHead>n</TableHead>
+                            <TableHead>Agreement</TableHead>
+                            <TableHead>PABAK</TableHead>
+                            <TableHead>Gwet</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {interraterSummary.by_model.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-muted-foreground">No paired model data</TableCell>
+                            </TableRow>
+                          ) : interraterSummary.by_model.map((row) => (
+                            <TableRow key={row.model_name}>
+                              <TableCell>{row.model_name}</TableCell>
+                              <TableCell>{row.n}</TableCell>
+                              <TableCell>{formatPercent(row.percent_agreement)}</TableCell>
+                              <TableCell>{formatStat(row.pabak)}</TableCell>
+                              <TableCell>{formatStat(row.gwet_ac1)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="container mx-auto py-8">
@@ -849,13 +1387,21 @@ function SupervisorDashboard() {
                   <CardDescription>Review all evaluation metrics and scores</CardDescription>
                 </div>
                 {selectedEvaluator && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={clearEvaluatorFilter}
-                  >
-                    Show All Evaluations
-                  </Button>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {interraterSummary && (
+                      <>
+                        {renderInterraterExportMenu('csv')}
+                        {renderInterraterExportMenu('excel')}
+                      </>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearEvaluatorFilter}
+                    >
+                      Show All Evaluations
+                    </Button>
+                  </div>
                 )}
               </div>
             </CardHeader>
@@ -878,9 +1424,12 @@ function SupervisorDashboard() {
 
                   if (evaluatorEvaluations.length === 0) {
                     return (
-                      <div className="text-center py-6 text-muted-foreground">
-                        No evaluations found for this evaluator
-                      </div>
+                      <>
+                        {renderInterraterSummaryPanel()}
+                        <div className="text-center py-6 text-muted-foreground">
+                          No evaluations found for this evaluator
+                        </div>
+                      </>
                     )
                   }
 
@@ -892,6 +1441,7 @@ function SupervisorDashboard() {
                       <Accordion type="single" collapsible className="w-full">
                         {Object.entries(batchEvaluations).map(([caseId, caseEvaluations], caseIndex) => {
                           const caseDetails = getCaseDetails(caseId)
+                          const caseInterrater = getCaseInterraterSummary(caseId)
                           const sortedModels = Array.from(new Set(caseEvaluations.map(evaluation => evaluation.model_id)))
                           const completedMetrics = caseEvaluations.filter(evaluation => evaluation.score >= 1).length
                           const caseStatusLabel = caseEvaluations.length === 0
@@ -933,6 +1483,26 @@ function SupervisorDashboard() {
                               </AccordionTrigger>
                               <AccordionContent>
                                 <div className="pt-2 pb-4 px-4">
+                                  {caseInterrater && (
+                                    <div className="mb-4 grid gap-3 rounded-md border border-border/60 bg-muted/20 p-3 text-sm md:grid-cols-4">
+                                      <div>
+                                        <p className="text-xs text-muted-foreground">Interrater progress</p>
+                                        <p className="font-semibold">{caseInterrater.overlap_completed} / {caseInterrater.expected_pairs}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-muted-foreground">Selected / Opposite</p>
+                                        <p className="font-semibold">{caseInterrater.selected_completed} / {caseInterrater.opposite_completed}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-muted-foreground">Concordant / Divergent</p>
+                                        <p className="font-semibold">{caseInterrater.concordant} / {caseInterrater.divergent}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-muted-foreground">Missing selected / opposite</p>
+                                        <p className="font-semibold">{caseInterrater.missing_selected} / {caseInterrater.missing_opposite}</p>
+                                      </div>
+                                    </div>
+                                  )}
                                   {Object.entries(modelGroups).length === 0 ? (
                                     <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
                                       No evaluation metrics are available for this case.
@@ -977,27 +1547,54 @@ function SupervisorDashboard() {
                                         <TableHeader>
                                           <TableRow>
                                             <TableHead>Metric</TableHead>
-                                            <TableHead>Score</TableHead>
+                                            <TableHead>Selected Value</TableHead>
+                                            <TableHead>Opposite Value</TableHead>
+                                            <TableHead>Interrater Agreement</TableHead>
                                             <TableHead>Date</TableHead>
                                           </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                          {modelEvals.map(evaluation => (
-                                            <TableRow key={evaluation.id}>
-                                              <TableCell>{getMetricName(evaluation.metric_id, evaluation.metric_name)}</TableCell>
-                                              <TableCell>
-                                                {(() => {
-                                                  const badge = getScoreBadge(evaluation.score)
-                                                  return (
-                                                    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${badge.className}`}>
-                                                      {badge.label}
+                                          {modelEvals.map(evaluation => {
+                                            const scoreBadge = getScoreBadge(evaluation.score)
+                                            const peerScoreBadge = getPeerScoreBadge(evaluation.peer_score)
+                                            const agreementBadge = getAgreementBadge(evaluation.agreement_status)
+
+                                            return (
+                                              <TableRow key={evaluation.id}>
+                                                <TableCell>{getMetricName(evaluation.metric_id, evaluation.metric_name)}</TableCell>
+                                                <TableCell>
+                                                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${scoreBadge.className}`}>
+                                                    {scoreBadge.label}
+                                                  </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                  <div className="flex flex-col items-start gap-1">
+                                                    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${peerScoreBadge.className}`}>
+                                                      {peerScoreBadge.label}
                                                     </span>
-                                                  )
-                                                })()}
-                                              </TableCell>
-                                              <TableCell>{formatDate(evaluation.created_at)}</TableCell>
-                                            </TableRow>
-                                          ))}
+                                                    {evaluation.peer_evaluator_name && (
+                                                      <span className="max-w-44 truncate text-xs text-muted-foreground">
+                                                        {evaluation.peer_evaluator_name}
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                  <span
+                                                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${agreementBadge.className}`}
+                                                    title={
+                                                      evaluation.peer_evaluator_name
+                                                        ? `${evaluation.peer_evaluator_name}: ${evaluation.peer_score ?? 'not scored'}`
+                                                        : undefined
+                                                    }
+                                                  >
+                                                    {agreementBadge.label}
+                                                  </span>
+                                                </TableCell>
+                                                <TableCell>{formatDate(evaluation.created_at)}</TableCell>
+                                              </TableRow>
+                                            )
+                                          })}
                                         </TableBody>
                                       </Table>
                                     </div>
@@ -1013,22 +1610,25 @@ function SupervisorDashboard() {
                   }
 
                   return (
-                    <Tabs value={caseTab} onValueChange={(v) => setCaseTab(v as 'original' | 'cross')}>
-                      <TabsList className="mb-4">
-                        <TabsTrigger value="original">
-                          Original Cases ({Object.keys(batch1Evaluations).length})
-                        </TabsTrigger>
-                        <TabsTrigger value="cross">
-                          Cross-Assigned ({Object.keys(batch2Evaluations).length})
-                        </TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="original">
-                        {renderBatchAccordion(batch1Evaluations, 'No original cases found.')}
-                      </TabsContent>
-                      <TabsContent value="cross">
-                        {renderBatchAccordion(batch2Evaluations, 'No cross-assigned cases found.')}
-                      </TabsContent>
-                    </Tabs>
+                    <>
+                      {renderInterraterSummaryPanel()}
+                      <Tabs value={caseTab} onValueChange={(v) => setCaseTab(v as 'original' | 'cross')}>
+                        <TabsList className="mb-4">
+                          <TabsTrigger value="original">
+                            Original Cases ({Object.keys(batch1Evaluations).length})
+                          </TabsTrigger>
+                          <TabsTrigger value="cross">
+                            Cross-Assigned ({Object.keys(batch2Evaluations).length})
+                          </TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="original">
+                          {renderBatchAccordion(batch1Evaluations, 'No original cases found.')}
+                        </TabsContent>
+                        <TabsContent value="cross">
+                          {renderBatchAccordion(batch2Evaluations, 'No cross-assigned cases found.')}
+                        </TabsContent>
+                      </Tabs>
+                    </>
                   )
                 })()
               ) : (
@@ -1040,7 +1640,7 @@ function SupervisorDashboard() {
                       <Input
                         value={evaluationsQuery}
                         onChange={(event) => setEvaluationsQuery(event.target.value)}
-                        placeholder="Search case, evaluator, model, metric, or status"
+                        placeholder="Search case, evaluator, model, metric, score, or agreement"
                         className="bg-background"
                       />
                     </div>
@@ -1056,7 +1656,7 @@ function SupervisorDashboard() {
                           <SelectItem value="evaluator">Evaluator</SelectItem>
                           <SelectItem value="model">Model</SelectItem>
                           <SelectItem value="metric">Metric</SelectItem>
-                          <SelectItem value="status">Status</SelectItem>
+                          <SelectItem value="status">Agreement</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1081,7 +1681,9 @@ function SupervisorDashboard() {
                         <TableHead>Evaluator</TableHead>
                         <TableHead>Model</TableHead>
                         <TableHead>Metric</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Evaluator Value</TableHead>
+                        <TableHead>Opposite Value</TableHead>
+                        <TableHead>Interrater Agreement</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">Action</TableHead>
                       </TableRow>
@@ -1089,12 +1691,14 @@ function SupervisorDashboard() {
                     <TableBody>
                       {filteredAndSortedEvaluations.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center">No evaluations match the current filter</TableCell>
+                          <TableCell colSpan={9} className="text-center">No evaluations match the current filter</TableCell>
                         </TableRow>
                       ) : (
                         filteredAndSortedEvaluations.map((evaluation, index) => {
                           const caseDetails = getCaseDetails(evaluation.case_id);
                           const scoreBadge = getScoreBadge(evaluation.score)
+                          const peerScoreBadge = getPeerScoreBadge(evaluation.peer_score)
+                          const agreementBadge = getAgreementBadge(evaluation.agreement_status)
                               const modelIndex = (modelOrdinalMap[evaluation.case_id] && typeof modelOrdinalMap[evaluation.case_id][evaluation.model_id] === 'number')
                                 ? modelOrdinalMap[evaluation.case_id][evaluation.model_id]
                                 : 0
@@ -1119,7 +1723,9 @@ function SupervisorDashboard() {
                                   <p className="text-xs text-muted-foreground font-mono break-all">{evaluation.case_id}</p>
                                 </div>
                               </TableCell>
-                              <TableCell>{getEvaluatorName(evaluation.evaluator_id)}</TableCell>
+                              <TableCell>
+                                {evaluation.evaluator_name || getEvaluatorName(evaluation.evaluator_id)}
+                              </TableCell>
                               <TableCell>
                                 <div className="space-y-1">
                                   <div className="font-medium text-foreground">
@@ -1134,6 +1740,30 @@ function SupervisorDashboard() {
                               <TableCell>
                                 <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${scoreBadge.className}`}>
                                   {scoreBadge.label}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col items-start gap-1">
+                                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${peerScoreBadge.className}`}>
+                                    {peerScoreBadge.label}
+                                  </span>
+                                  {evaluation.peer_evaluator_name && (
+                                    <span className="max-w-44 truncate text-xs text-muted-foreground">
+                                      {evaluation.peer_evaluator_name}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span
+                                  className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${agreementBadge.className}`}
+                                  title={
+                                    evaluation.peer_evaluator_name
+                                      ? `${evaluation.peer_evaluator_name}: ${evaluation.peer_score ?? 'not scored'}`
+                                      : undefined
+                                  }
+                                >
+                                  {agreementBadge.label}
                                 </span>
                               </TableCell>
                               <TableCell>{formatDate(evaluation.created_at)}</TableCell>

@@ -44,6 +44,19 @@ interface CasesResponse {
   completed_cases: number
 }
 
+/**
+ * Extracts the human-readable case label from a study/image ID.
+ * e.g. "CASE_Syn_MIMIC_JPG_Input_1_CENTRAL_LINES" → "CENTRAL LINES"
+ * Falls back to the original string if the pattern is not found.
+ */
+function extractCaseName(id: string): string {
+  const match = id.match(/_[Ii]nput_\d+_(.+)$/)
+  if (match) {
+    return match[1].replace(/_/g, ' ')
+  }
+  return id
+}
+
 // Metric Card Component
 function MetricCard({ 
   icon: Icon, 
@@ -118,12 +131,12 @@ function CaseRow({
             <h3 className="text-lg font-semibold text-white group-hover:text-blue-300 transition-colors">
               Case #{index + 1}
             </h3>
-            <code className="text-xs bg-slate-900/80 text-slate-300 px-2.5 py-1.5 rounded font-mono">
-              {caseItem.image_id}
+            <code className="text-xs bg-slate-900/80 text-slate-300 px-2.5 py-1.5 rounded font-mono tracking-wide">
+              {extractCaseName(caseItem.image_id)}
             </code>
           </div>
           <p className="text-sm text-gray-400 mb-4">
-            Study ID: <span className="text-gray-300">{caseItem.study_id || 'N/A'}</span>
+            Study ID: <span className="text-gray-300">{caseItem.study_id ? extractCaseName(caseItem.study_id) : 'N/A'}</span>
           </p>
 
           {/* Progress Bar */}

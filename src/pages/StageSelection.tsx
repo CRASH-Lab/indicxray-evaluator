@@ -3,19 +3,37 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { Stethoscope, Play } from 'lucide-react'
 // import { BrainCircuit } from 'lucide-react'
+
+const HIDE_TUTORIAL_PROMPT_KEY = 'indicxray_hideTutorialPrompt'
 
 function StageSelection() {
   const { userId } = useParams()
   const navigate = useNavigate()
   const [isTutorialOpen, setIsTutorialOpen] = useState(false)
   const [showLoginTutorialPrompt, setShowLoginTutorialPrompt] = useState(false)
+  const [dontShowAgain, setDontShowAgain] = useState(false)
 
   useEffect(() => {
-    // Show tutorial prompt when user logs in
-    setShowLoginTutorialPrompt(true)
+    // Only show tutorial prompt if the user hasn't opted out
+    const isHidden = localStorage.getItem(HIDE_TUTORIAL_PROMPT_KEY) === 'true'
+    if (!isHidden) {
+      setShowLoginTutorialPrompt(true)
+    }
   }, [])
+
+  const dismissTutorialPrompt = (openTutorial = false) => {
+    if (dontShowAgain) {
+      localStorage.setItem(HIDE_TUTORIAL_PROMPT_KEY, 'true')
+    }
+    setShowLoginTutorialPrompt(false)
+    if (openTutorial) {
+      setIsTutorialOpen(true)
+    }
+  }
 
   const handleLogout = () => {
       localStorage.removeItem('authToken')
@@ -142,20 +160,28 @@ function StageSelection() {
             </p>
           </div>
 
+          <div className="flex items-center gap-2 py-1">
+            <Checkbox
+              id="dontShowAgain"
+              checked={dontShowAgain}
+              onCheckedChange={(checked) => setDontShowAgain(checked === true)}
+            />
+            <Label htmlFor="dontShowAgain" className="text-sm text-gray-400 cursor-pointer select-none">
+              Don't show this again
+            </Label>
+          </div>
+
           <div className="flex gap-3 flex-col-reverse">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowLoginTutorialPrompt(false)}
+            <Button
+              variant="outline"
+              onClick={() => dismissTutorialPrompt(false)}
               className="w-full"
             >
               Skip Tutorial
             </Button>
-            <Button 
+            <Button
               className="w-full bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                setShowLoginTutorialPrompt(false)
-                setIsTutorialOpen(true)
-              }}
+              onClick={() => dismissTutorialPrompt(true)}
             >
               <Play className="w-4 h-4 mr-2" />
               Watch Tutorial
