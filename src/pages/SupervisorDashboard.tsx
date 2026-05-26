@@ -9,6 +9,14 @@ import {
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { 
   Table, 
   TableBody, 
@@ -59,6 +67,12 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   getAllEvaluators,
   getMetrics,
   getUserDetails,
@@ -77,7 +91,7 @@ import {
   interraterSummarySheets,
   makeReportFilename,
 } from '@/lib/reportExports'
-import { ArrowRight, CheckCircle2, Copy, Download, Loader2, TriangleAlert } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Copy, Download, Info, Loader2, TriangleAlert } from 'lucide-react'
 
 // Type definitions for better type safety
 interface Evaluator {
@@ -85,6 +99,8 @@ interface Evaluator {
   name: string;
   email: string;
   role: string;
+  reviewer_group?: string;
+  evaluator_group?: string;
 }
 
 interface Evaluation {
@@ -204,6 +220,8 @@ interface InterraterSummary {
   generated_at: string;
 }
 
+const HIDE_SUPERVISOR_TUTORIAL_PROMPT_KEY = 'indicxray_hideSupervisorTutorialPrompt'
+
 function SupervisorDashboard() {
   const { supervisorId } = useParams()
   const navigate = useNavigate()
@@ -230,6 +248,9 @@ function SupervisorDashboard() {
   const [evaluationsQuery, setEvaluationsQuery] = useState('')
   const [evaluationsSortBy, setEvaluationsSortBy] = useState<'case' | 'evaluator' | 'model' | 'metric' | 'status' | 'date'>('date')
   const [evaluationsSortDirection, setEvaluationsSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [isSupervisorTutorialOpen, setIsSupervisorTutorialOpen] = useState(false)
+  const [showSupervisorTutorialPrompt, setShowSupervisorTutorialPrompt] = useState(false)
+  const [dontShowSupervisorTutorialAgain, setDontShowSupervisorTutorialAgain] = useState(false)
   const [evaluationsPagination, setEvaluationsPagination] = useState<PaginatedEvaluationsResponse>({
     count: 0,
     next: null,
@@ -270,6 +291,23 @@ function SupervisorDashboard() {
 
   const selectedEvaluatorLabel =
     selectedEvaluatorDetails?.name || selectedEvaluatorDetails?.email || selectedEvaluator || ''
+
+  useEffect(() => {
+    const isHidden = localStorage.getItem(HIDE_SUPERVISOR_TUTORIAL_PROMPT_KEY) === 'true'
+    if (!isHidden) {
+      setShowSupervisorTutorialPrompt(true)
+    }
+  }, [])
+
+  const dismissSupervisorTutorialPrompt = (openTutorial = false) => {
+    if (dontShowSupervisorTutorialAgain) {
+      localStorage.setItem(HIDE_SUPERVISOR_TUTORIAL_PROMPT_KEY, 'true')
+    }
+    setShowSupervisorTutorialPrompt(false)
+    if (openTutorial) {
+      setIsSupervisorTutorialOpen(true)
+    }
+  }
 
   // If a selected evaluator id exists but we couldn't find details in the initial list,
   // attempt to fetch the user's details from the API so the UI can show their card.
@@ -556,13 +594,13 @@ function SupervisorDashboard() {
     if (score >= 1) {
       return {
         label: '1',
-        className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+        className: 'border-emerald-500/40 bg-emerald-500/10 text-white',
       }
     }
 
     return {
       label: '0',
-      className: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300',
+      className: 'border-red-500/40 bg-red-500/10 text-white',
     }
   }
 
@@ -626,21 +664,6 @@ function SupervisorDashboard() {
     } catch (error) {
       console.warn('Failed to copy text:', error)
     }
-  }
-
-  const openReviewDetails = (evaluation: Evaluation, caseImageId: string) => {
-    const params = new URLSearchParams({
-      case: evaluation.case_id,
-      evaluator: evaluation.evaluator_id,
-      model: evaluation.model_id,
-      metric: evaluation.metric_id,
-    })
-
-    if (caseImageId) {
-      params.set('caseLabel', caseImageId)
-    }
-
-    navigate(`/supervisor/analysis?${params.toString()}`)
   }
 
   const getStage2RowState = (completedCount: number, totalCount: number) => {
@@ -727,6 +750,28 @@ function SupervisorDashboard() {
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
     </div>
+  )
+
+  const renderInfoHeader = (label: string, description: string, className?: string) => (
+    <TableHead className={className}>
+      <div className="flex items-center gap-1.5">
+        <span>{label}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-primary/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              aria-label={`${label} column information`}
+            >
+              <Info className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-64 text-xs leading-relaxed" side="top">
+            {description}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TableHead>
   )
 
   const getInterraterExportSheets = () => {
@@ -826,6 +871,14 @@ function SupervisorDashboard() {
 
   const handleTabChange = (nextTab: string) => {
     setActiveTab(nextTab)
+
+    if (nextTab === 'evaluations') {
+      setEvaluationsPage(1)
+      setSelectedEvaluator(null)
+      updateDashboardUrl({ tab: nextTab, page: 1, evaluator: null })
+      return
+    }
+
     updateDashboardUrl({ tab: nextTab })
   }
 
@@ -1208,6 +1261,7 @@ function SupervisorDashboard() {
   }
 
   return (
+    <TooltipProvider delayDuration={150}>
     <div className="container mx-auto py-8">
       <Card className="mb-6">
         <CardHeader>
@@ -1216,25 +1270,59 @@ function SupervisorDashboard() {
               <CardTitle>Supervisor Dashboard</CardTitle>
               <CardDescription>Review evaluator performance and case evaluations</CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => navigate('/supervisor/analysis')}>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="outline"
+                className="border-slate-700 bg-slate-950/80 text-white transition-colors hover:border-primary/70 hover:bg-primary/15 hover:text-primary"
+                onClick={() => navigate('/supervisor/analysis')}
+              >
                 Analysis
               </Button>
-              <Button variant="default" onClick={() => navigate('/supervisor/users')}>
+              <Button
+                variant="outline"
+                className="border-slate-700 bg-slate-950/80 text-white transition-colors hover:border-primary/70 hover:bg-primary/15 hover:text-primary"
+                onClick={() => navigate('/supervisor/users')}
+              >
                 Manage Users
               </Button>
-              <Button variant="outline" onClick={handleLogout}>Log out</Button>
+              <Button
+                variant="outline"
+                className="border-slate-700 bg-slate-950/80 text-white transition-colors hover:border-primary/70 hover:bg-primary/15 hover:text-primary"
+                onClick={handleLogout}
+              >
+                Log out
+              </Button>
             </div>
           </div>
         </CardHeader>
       </Card>
       
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full grid-cols-4 mb-6">
-          <TabsTrigger value="evaluators">Evaluators</TabsTrigger>
-          <TabsTrigger value="evaluations">Stage 1 Evaluations</TabsTrigger>
-          <TabsTrigger value="stage2">Stage 2 Status</TabsTrigger>
-          <TabsTrigger value="metrics">Metrics</TabsTrigger>
+        <TabsList className="mb-6 grid h-auto w-full grid-cols-2 gap-1 rounded-lg border border-slate-800 bg-slate-900/80 p-1 sm:grid-cols-4">
+          <TabsTrigger
+            value="evaluators"
+            className="min-h-11 rounded-md text-sm font-semibold text-slate-400 transition-colors hover:bg-primary/15 hover:text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+          >
+            Evaluators
+          </TabsTrigger>
+          <TabsTrigger
+            value="evaluations"
+            className="min-h-11 rounded-md text-sm font-semibold text-slate-400 transition-colors hover:bg-primary/15 hover:text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+          >
+            Stage 1 Evaluations
+          </TabsTrigger>
+          <TabsTrigger
+            value="stage2"
+            className="min-h-11 rounded-md text-sm font-semibold text-slate-400 transition-colors hover:bg-primary/15 hover:text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+          >
+            Stage 2 Status
+          </TabsTrigger>
+          <TabsTrigger
+            value="metrics"
+            className="min-h-11 rounded-md text-sm font-semibold text-slate-400 transition-colors hover:bg-primary/15 hover:text-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+          >
+            Metrics
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="evaluators">
@@ -1243,7 +1331,7 @@ function SupervisorDashboard() {
               <CardTitle>Evaluators</CardTitle>
               <CardDescription>Choose a registered evaluator from the dropdown to review their details or open their evaluations.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-6 pb-6">
               {loading.evaluators ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -1253,9 +1341,8 @@ function SupervisorDashboard() {
                   No evaluators found.
                 </div>
               ) : (
-                <div className="space-y-6">
-                  <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                    <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-slate-900/90 via-slate-900 to-slate-800/80 p-4 shadow-sm">
+                <div className="grid items-stretch gap-5 xl:grid-cols-2">
+                    <div className="flex h-full min-h-[170px] flex-col rounded-xl border border-border/60 bg-gradient-to-br from-slate-900/90 via-slate-900 to-slate-800/80 p-4 shadow-sm">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium text-white">Registered Evaluators</p>
@@ -1309,22 +1396,22 @@ function SupervisorDashboard() {
                       </Popover>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-700/70 bg-slate-950/90 p-4 text-slate-100 shadow-lg shadow-black/20 backdrop-blur-sm">
+                    <div className="flex h-full min-h-[170px] rounded-xl border border-slate-700/70 bg-slate-950/90 p-4 text-slate-100 shadow-lg shadow-black/20 backdrop-blur-sm">
                       {selectedEvaluatorDetails ? (
-                        <div className="space-y-4">
+                        <div className="flex w-full flex-col justify-between gap-4">
                           <div>
                             <p className="text-xs uppercase tracking-wide text-slate-400">Selected Evaluator</p>
                             <h3 className="mt-1 text-xl font-semibold text-white">{selectedEvaluatorDetails.name}</h3>
                             <p className="text-sm text-slate-300 break-all">{selectedEvaluatorDetails.email}</p>
-                          </div>
 
-                          <div className="flex flex-wrap gap-2">
-                            <span className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">
-                              Role: {selectedEvaluatorDetails.role}
-                            </span>
-                            <span className="inline-flex items-center rounded-full border border-slate-500/40 bg-slate-800/70 px-3 py-1 text-xs font-semibold text-slate-200">
-                              Registered evaluator
-                            </span>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              <span className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+                                Role: {selectedEvaluatorDetails.role}
+                              </span>
+                              <span className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">
+                                Group: {selectedEvaluatorDetails.reviewer_group || selectedEvaluatorDetails.evaluator_group || 'Unknown'}
+                              </span>
+                            </div>
                           </div>
 
                           <div className="flex flex-wrap gap-2">
@@ -1343,7 +1430,7 @@ function SupervisorDashboard() {
                           </div>
                         </div>
                       ) : selectedEvaluator ? (
-                        <div className="space-y-4">
+                        <div className="flex w-full flex-col justify-between gap-4">
                           <div>
                             <p className="text-xs uppercase tracking-wide text-slate-400">Selected Evaluator</p>
                             <h3 className="mt-1 text-xl font-semibold text-white">{selectedEvaluatorLabel}</h3>
@@ -1366,12 +1453,11 @@ function SupervisorDashboard() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex min-h-[168px] items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center text-sm text-muted-foreground">
+                        <div className="flex min-h-28 w-full items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-6 py-8 text-center text-sm text-muted-foreground">
                           Pick an evaluator from the searchable picker to show their email, role, and evaluations link here.
                         </div>
                       )}
                     </div>
-                  </div>
                 </div>
               )}
             </CardContent>
@@ -1466,7 +1552,7 @@ function SupervisorDashboard() {
 
                           return (
                             <AccordionItem key={caseId} value={caseId}>
-                              <AccordionTrigger className="hover:bg-gray-50 px-4 rounded">
+                              <AccordionTrigger className="rounded px-4 hover:bg-primary/10">
                                 <div className="flex items-center justify-between w-full gap-4">
                                   <div className="text-left">
                                     <div className="font-medium text-foreground">
@@ -1546,11 +1632,11 @@ function SupervisorDashboard() {
                                       <Table>
                                         <TableHeader>
                                           <TableRow>
-                                            <TableHead>Metric</TableHead>
-                                            <TableHead>Selected Value</TableHead>
-                                            <TableHead>Opposite Value</TableHead>
-                                            <TableHead>Interrater Agreement</TableHead>
-                                            <TableHead>Date</TableHead>
+                                            {renderInfoHeader('Metric', 'Evaluation criterion that was scored for this model response.')}
+                                            {renderInfoHeader('Selected Value', 'Score given by the selected evaluator. 1 means present or accepted; 0 means absent or rejected.')}
+                                            {renderInfoHeader('Opposite Value', 'Score from the paired evaluator for the same case, model, and metric when a paired score exists.')}
+                                            {renderInfoHeader('Interrater Agreement', 'Whether the selected and opposite evaluator scores match, differ, are pending, or are unpaired.')}
+                                            {renderInfoHeader('Date', 'Date when this evaluation score was submitted.')}
                                           </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -1674,24 +1760,33 @@ function SupervisorDashboard() {
                     </div>
                   </div>
 
-                  <Table>
+                  <Table className="min-w-[1180px] table-fixed">
+                    <colgroup>
+                      <col className="w-[27%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[7%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[11%]" />
+                      <col className="w-[7%]" />
+                    </colgroup>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Case ID</TableHead>
-                        <TableHead>Evaluator</TableHead>
-                        <TableHead>Model</TableHead>
-                        <TableHead>Metric</TableHead>
-                        <TableHead>Evaluator Value</TableHead>
-                        <TableHead>Opposite Value</TableHead>
-                        <TableHead>Interrater Agreement</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
+                        {renderInfoHeader('Case ID', 'Case identifier and image label for the evaluated X-ray case.', 'px-3')}
+                        {renderInfoHeader('Evaluator', 'Evaluator who submitted this score.', 'px-3')}
+                        {renderInfoHeader('Model', 'AI model whose response was evaluated for this case.', 'px-3')}
+                        {renderInfoHeader('Metric', 'Evaluation criterion that was scored for this model response.', 'px-3')}
+                        {renderInfoHeader('Evaluator Value', 'Score given by this evaluator. 1 means present or accepted; 0 means absent or rejected.', 'px-3')}
+                        {renderInfoHeader('Opposite Value', 'Score from the paired evaluator for the same case, model, and metric when a paired score exists.', 'px-3')}
+                        {renderInfoHeader('Interrater Agreement', 'Whether the evaluator and opposite evaluator scores match, differ, are pending, or are unpaired.', 'px-3')}
+                        {renderInfoHeader('Date', 'Date when this evaluation score was submitted.', 'px-3 whitespace-nowrap')}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredAndSortedEvaluations.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center">No evaluations match the current filter</TableCell>
+                          <TableCell colSpan={8} className="text-center">No evaluations match the current filter</TableCell>
                         </TableRow>
                       ) : (
                         filteredAndSortedEvaluations.map((evaluation, index) => {
@@ -1704,7 +1799,7 @@ function SupervisorDashboard() {
                                 : 0
                           return (
                             <TableRow key={evaluation.id}>
-                              <TableCell>
+                              <TableCell className="px-3 py-5 align-top">
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium text-foreground">
@@ -1720,13 +1815,17 @@ function SupervisorDashboard() {
                                       <Copy className="h-4 w-4" />
                                     </Button>
                                   </div>
-                                  <p className="text-xs text-muted-foreground font-mono break-all">{evaluation.case_id}</p>
+                                  <p className="truncate font-mono text-xs text-muted-foreground" title={evaluation.case_id}>
+                                    {evaluation.case_id}
+                                  </p>
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                {evaluation.evaluator_name || getEvaluatorName(evaluation.evaluator_id)}
+                              <TableCell className="px-3 py-5 align-top">
+                                <span className="block max-w-full break-words">
+                                  {evaluation.evaluator_name || getEvaluatorName(evaluation.evaluator_id)}
+                                </span>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="px-3 py-5 align-top">
                                 <div className="space-y-1">
                                   <div className="font-medium text-foreground">
                                     {(evaluation.model_name && String(evaluation.model_name).trim().length > 0)
@@ -1736,25 +1835,29 @@ function SupervisorDashboard() {
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell>{getMetricName(evaluation.metric_id, evaluation.metric_name)}</TableCell>
-                              <TableCell>
+                              <TableCell className="px-3 py-5 align-top">
+                                <span className="block max-w-full break-words">
+                                  {getMetricName(evaluation.metric_id, evaluation.metric_name)}
+                                </span>
+                              </TableCell>
+                              <TableCell className="px-3 py-5 align-top">
                                 <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${scoreBadge.className}`}>
                                   {scoreBadge.label}
                                 </span>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="px-3 py-5 align-top">
                                 <div className="flex flex-col items-start gap-1">
                                   <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${peerScoreBadge.className}`}>
                                     {peerScoreBadge.label}
                                   </span>
                                   {evaluation.peer_evaluator_name && (
-                                    <span className="max-w-44 truncate text-xs text-muted-foreground">
+                                    <span className="block max-w-full truncate text-xs text-muted-foreground" title={evaluation.peer_evaluator_name}>
                                       {evaluation.peer_evaluator_name}
                                     </span>
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="px-3 py-5 align-top">
                                 <span
                                   className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${agreementBadge.className}`}
                                   title={
@@ -1766,17 +1869,7 @@ function SupervisorDashboard() {
                                   {agreementBadge.label}
                                 </span>
                               </TableCell>
-                              <TableCell>{formatDate(evaluation.created_at)}</TableCell>
-                              <TableCell className="text-right">
-                                <Button
-                                  variant={evaluation.score === 0 ? 'destructive' : 'outline'}
-                                  size="sm"
-                                  onClick={() => openReviewDetails(evaluation, caseDetails.image_id)}
-                                >
-                                  {evaluation.score === 0 ? 'Review Details' : 'Open Analysis'}
-                                  <ArrowRight className="ml-2 h-4 w-4" />
-                                </Button>
-                              </TableCell>
+                              <TableCell className="px-3 py-5 align-top whitespace-nowrap">{formatDate(evaluation.created_at)}</TableCell>
                             </TableRow>
                           );
                         })
@@ -1985,6 +2078,102 @@ function SupervisorDashboard() {
         </TabsContent>
       </Tabs>
 
+      <Dialog open={isSupervisorTutorialOpen} onOpenChange={setIsSupervisorTutorialOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Supervisor Dashboard Tutorial</DialogTitle>
+          </DialogHeader>
+
+          <div className="rounded-lg border border-dashed border-slate-700 bg-slate-900/50 p-8">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/10">
+              <Info className="h-9 w-9 text-blue-400" />
+            </div>
+            <p className="mb-2 text-center text-lg font-semibold text-white">Supervisor workflow overview</p>
+            <p className="mx-auto max-w-xl text-center text-sm text-gray-400">
+              Use this dashboard to review evaluator progress, compare paired ratings, inspect interrater agreement,
+              and export supervisor-ready reports.
+            </p>
+          </div>
+
+          <div className="mt-6 rounded bg-slate-800/50 p-4 text-sm text-gray-400">
+            <p className="mb-2 font-semibold text-white">Tutorial Topics:</p>
+            <ul className="list-inside list-disc space-y-1 text-xs">
+              <li>Pick an evaluator and open their Stage 1 evaluation details</li>
+              <li>Review original and cross-assigned cases separately</li>
+              <li>Read interrater agreement, PABAK, and Gwet AC1 summaries</li>
+              <li>Use Pair Review to find incomplete or divergent reviewer pairs</li>
+              <li>Export CSV or Excel reports with selected columns</li>
+            </ul>
+          </div>
+
+          <div className="mt-6 flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsSupervisorTutorialOpen(false)}
+              className="flex-1"
+            >
+              Close
+            </Button>
+            <Button
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setIsSupervisorTutorialOpen(false)
+                setActiveTab('evaluators')
+                updateDashboardUrl({ tab: 'evaluators', evaluator: selectedEvaluator })
+              }}
+            >
+              Go to Evaluators
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSupervisorTutorialPrompt} onOpenChange={setShowSupervisorTutorialPrompt}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">Welcome to Supervisor Dashboard</DialogTitle>
+          </DialogHeader>
+
+          <div className="py-6 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/10">
+              <Info className="h-9 w-9 text-blue-400" />
+            </div>
+            <p className="mb-2 font-medium text-gray-300">Want a quick dashboard walkthrough?</p>
+            <p className="text-sm text-gray-400">
+              We recommend reviewing the supervisor tools before checking evaluator progress and agreement reports.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 py-1">
+            <Checkbox
+              id="dontShowSupervisorTutorialAgain"
+              checked={dontShowSupervisorTutorialAgain}
+              onCheckedChange={(checked) => setDontShowSupervisorTutorialAgain(checked === true)}
+            />
+            <Label htmlFor="dontShowSupervisorTutorialAgain" className="cursor-pointer select-none text-sm text-gray-400">
+              Don't show this again
+            </Label>
+          </div>
+
+          <div className="flex flex-col-reverse gap-3">
+            <Button
+              variant="outline"
+              onClick={() => dismissSupervisorTutorialPrompt(false)}
+              className="w-full"
+            >
+              Skip Tutorial
+            </Button>
+            <Button
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              onClick={() => dismissSupervisorTutorialPrompt(true)}
+            >
+              <Info className="mr-2 h-4 w-4" />
+              Watch Tutorial
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {error && (
         <Card className="mt-6 border-red-500">
           <CardContent className="pt-6">
@@ -1993,6 +2182,7 @@ function SupervisorDashboard() {
         </Card>
       )}
     </div>
+    </TooltipProvider>
   )
 }
 
