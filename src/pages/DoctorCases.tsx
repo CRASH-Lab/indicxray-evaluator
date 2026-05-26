@@ -1,9 +1,9 @@
 import { getEvaluatorAssignments, getUserDetails } from '@/services'
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { 
   AlertCircle, 
   Menu, 
@@ -13,15 +13,14 @@ import {
   ListChecks,
   Clock,
   CheckCircle2,
-  TrendingUp,
-  Bell,
-  Settings,
   User,
   LogOut,
-  Loader2
+  Play,
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { saveCaseNavigationManifest } from '@/hooks/use-case-navigation'
+
+type CaseStatusFilter = 'all' | 'pending' | 'in_progress' | 'completed'
 
 interface CaseWithDetails {
   id: string
@@ -62,15 +61,28 @@ function MetricCard({
   icon: Icon, 
   label, 
   value, 
-  trend 
+  trend,
+  isActive = false,
+  onClick,
 }: { 
   icon: any
   label: string
   value: number | string
   trend?: string
+  isActive?: boolean
+  onClick?: () => void
 }) {
   return (
-    <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-6 hover:border-slate-600/50 transition-colors">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left bg-slate-800/40 border rounded-xl p-6 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400/70 ${
+        isActive
+          ? 'border-blue-400/70 bg-blue-500/10'
+          : 'border-slate-700/50 hover:border-slate-600/50'
+      }`}
+      aria-pressed={isActive}
+    >
       <div className="flex items-center justify-between mb-4">
         <div className="p-2.5 bg-blue-500/10 rounded-lg">
           <Icon className="w-5 h-5 text-blue-400" />
@@ -81,7 +93,7 @@ function MetricCard({
       </div>
       <div className="text-3xl font-bold text-white mb-2">{value}</div>
       <p className="text-sm text-gray-400">{label}</p>
-    </div>
+    </button>
   )
 }
 
@@ -144,7 +156,7 @@ function CaseRow({
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-400">Progress</span>
               <span className="text-xs font-medium text-blue-300">
-                {caseItem.completed_evaluations}/{caseItem.total_evaluations} models
+                {caseItem.completed_evaluations}/{caseItem.total_evaluations} evaluations
               </span>
             </div>
             <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
@@ -179,15 +191,67 @@ function DashboardSidebar({
   onClose,
   doctorName,
   onLogout,
-  casesData
+  casesData,
+  activeFilter,
+  onFilterChange,
+  onViewTutorial,
 }: { 
   isOpen: boolean
   onClose: () => void
   doctorName: string
   onLogout: () => void
   casesData: CasesResponse | null
+  activeFilter: CaseStatusFilter
+  onFilterChange: (filter: CaseStatusFilter) => void
+  onViewTutorial: () => void
 }) {
   const [isStatusExpanded, setIsStatusExpanded] = useState(true)
+  const statusItems: Array<{
+    filter: CaseStatusFilter
+    label: string
+    count: number
+    icon: typeof ListChecks
+    classes: string
+    activeClasses: string
+  }> = [
+    {
+      filter: 'all',
+      label: 'All Cases',
+      count: casesData?.total_cases || 0,
+      icon: ListChecks,
+      classes: 'bg-slate-800/40 border-slate-700/50 text-slate-300 hover:bg-slate-800/70',
+      activeClasses: 'bg-blue-500/20 border-blue-500/40 text-blue-300',
+    },
+    {
+      filter: 'completed',
+      label: 'Completed',
+      count: casesData?.completed_cases || 0,
+      icon: CheckCircle2,
+      classes: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/15',
+      activeClasses: 'bg-emerald-500/20 border-emerald-400/60 text-emerald-200',
+    },
+    {
+      filter: 'in_progress',
+      label: 'In Progress',
+      count: casesData?.in_progress_cases || 0,
+      icon: Clock,
+      classes: 'bg-blue-500/10 border-blue-500/30 text-blue-300 hover:bg-blue-500/15',
+      activeClasses: 'bg-blue-500/20 border-blue-400/60 text-blue-200',
+    },
+    {
+      filter: 'pending',
+      label: 'Pending',
+      count: casesData?.pending_cases || 0,
+      icon: AlertCircle,
+      classes: 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/15',
+      activeClasses: 'bg-amber-500/20 border-amber-400/60 text-amber-200',
+    },
+  ]
+
+  function handleFilterClick(filter: CaseStatusFilter) {
+    onFilterChange(filter)
+    onClose()
+  }
 
   return (
     <>
@@ -226,8 +290,12 @@ function DashboardSidebar({
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 overflow-y-auto space-y-6">
           <button
-            onClick={() => setIsStatusExpanded(!isStatusExpanded)}
+            onClick={() => {
+              onFilterChange('all')
+              setIsStatusExpanded(!isStatusExpanded)
+            }}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30"
+            aria-pressed={activeFilter === 'all'}
           >
             <ListChecks className="w-5 h-5" />
             <span className="font-medium text-sm">Assigned Cases</span>
@@ -238,44 +306,40 @@ function DashboardSidebar({
             isStatusExpanded ? 'lg:max-h-96 lg:opacity-100' : 'lg:max-h-0 lg:opacity-0 lg:hidden'
           }`}>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Status Overview</p>
-            
-            {/* Completed */}
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-emerald-500/10 border-emerald-500/30">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm text-emerald-300 font-medium">Completed</span>
-              </div>
-              <span className="text-xs font-bold text-emerald-300 bg-emerald-500/20 px-2 py-1 rounded">
-                {casesData?.completed_cases || 0}
-              </span>
-            </div>
-
-            {/* In Progress */}
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-blue-500/10 border-blue-500/30">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-blue-400" />
-                <span className="text-sm text-blue-300 font-medium">In Progress</span>
-              </div>
-              <span className="text-xs font-bold text-blue-300 bg-blue-500/20 px-2 py-1 rounded">
-                {casesData?.in_progress_cases || 0}
-              </span>
-            </div>
-
-            {/* Pending */}
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg border bg-amber-500/10 border-amber-500/30">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-400" />
-                <span className="text-sm text-amber-300 font-medium">Pending</span>
-              </div>
-              <span className="text-xs font-bold text-amber-300 bg-amber-500/20 px-2 py-1 rounded">
-                {casesData?.pending_cases || 0}
-              </span>
-            </div>
+            {statusItems.map(({ filter, label, count, icon: Icon, classes, activeClasses }) => {
+              const isActive = activeFilter === filter
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => handleFilterClick(filter)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400/70 ${
+                    isActive ? activeClasses : classes
+                  }`}
+                  aria-pressed={isActive}
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className="w-4 h-4" />
+                    <span className="text-sm font-medium">{label}</span>
+                  </div>
+                  <span className="text-xs font-bold bg-current/10 px-2 py-1 rounded">
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </nav>
 
         {/* Bottom Actions */}
-        <div className="px-4 py-6 border-t border-slate-800">
+        <div className="px-4 py-6 border-t border-slate-800 space-y-2">
+          <button
+            onClick={onViewTutorial}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-blue-300 hover:bg-blue-500/10 transition-colors font-medium text-sm"
+          >
+            <Play className="w-5 h-5" />
+            <span>View Tutorial</span>
+          </button>
           <button
             onClick={onLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors font-medium text-sm"
@@ -296,6 +360,8 @@ function DoctorCases() {
   const [error, setError] = useState('')
   const [doctorInfo, setDoctorInfo] = useState({ name: 'Loading...', specialty: '' })
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<CaseStatusFilter>('all')
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false)
   const navigate = useNavigate()
   
   useEffect(() => {
@@ -308,8 +374,6 @@ function DoctorCases() {
       setError('')
       
       try {
-        const { getEvaluatorAssignments } = await import('@/services');
-        
         const [details, casesResponse] = await Promise.all([
           getUserDetails(doctorId),
           getEvaluatorAssignments() 
@@ -350,10 +414,18 @@ function DoctorCases() {
     };
   }, [doctorId]);
 
+  const allCases = casesData?.cases || []
+  const filteredCases = activeFilter === 'all'
+    ? allCases
+    : allCases.filter((caseItem) => caseItem.status === activeFilter)
+  const activeFilterLabel = activeFilter === 'all'
+    ? 'All Assigned Cases'
+    : activeFilter.replace('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase())
+
   function navigateToCase(caseId: string) {
-    if (casesData?.cases) {
+    if (filteredCases.length > 0) {
       saveCaseNavigationManifest({
-        assignmentIds: casesData.cases.map(c => c.id),
+        assignmentIds: filteredCases.map(c => c.id),
         doctorId: doctorId || '',
       });
     }
@@ -409,6 +481,9 @@ function DoctorCases() {
           doctorName={doctorInfo.name}
           onLogout={handleLogout}
           casesData={casesData}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          onViewTutorial={() => setIsTutorialOpen(true)}
         />
 
         {/* Main Content */}
@@ -465,38 +540,46 @@ function DoctorCases() {
                   icon={ListChecks}
                   label="Total Assigned"
                   value={casesData?.total_cases || 0}
+                  isActive={activeFilter === 'all'}
+                  onClick={() => setActiveFilter('all')}
                 />
                 <MetricCard
                   icon={AlertCircle}
                   label="Pending Cases"
                   value={casesData?.pending_cases || 0}
                   trend={casesData?.pending_cases === 0 ? '0% Done' : `${Math.round((casesData?.pending_cases || 0) / (casesData?.total_cases || 1) * 100)}% of total`}
+                  isActive={activeFilter === 'pending'}
+                  onClick={() => setActiveFilter('pending')}
                 />
                 <MetricCard
                   icon={Clock}
                   label="In Progress"
                   value={casesData?.in_progress_cases || 0}
                   trend={casesData?.in_progress_cases === 0 ? 'Complete' : `${Math.round((casesData?.in_progress_cases || 0) / (casesData?.total_cases || 1) * 100)}% of total`}
+                  isActive={activeFilter === 'in_progress'}
+                  onClick={() => setActiveFilter('in_progress')}
                 />
                 <MetricCard
                   icon={CheckCircle2}
                   label="Completed"
                   value={casesData?.completed_cases || 0}
                   trend={casesData?.completed_cases === 0 ? 'None' : `${Math.round((casesData?.completed_cases || 0) / (casesData?.total_cases || 1) * 100)}% done`}
+                  isActive={activeFilter === 'completed'}
+                  onClick={() => setActiveFilter('completed')}
                 />
               </div>
 
               {/* Assigned Cases Panel */}
               <div>
                 <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-white mb-2">Assigned Cases</h2>
+                  <h2 className="text-2xl font-bold text-white mb-2">{activeFilterLabel}</h2>
                   <p className="text-gray-400 text-sm">
-                    {casesData?.total_cases || 0} total cases assigned to you
+                    {filteredCases.length} of {casesData?.total_cases || 0} total cases shown
                   </p>
                 </div>
 
                 {/* No Cases */}
-                {(!casesData?.cases || casesData.cases.length === 0) && !error && (
+                {allCases.length === 0 && !error && (
                   <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-12 text-center">
                     <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
                       <ListChecks className="w-8 h-8 text-gray-400" />
@@ -508,10 +591,22 @@ function DoctorCases() {
                   </div>
                 )}
 
+                {allCases.length > 0 && filteredCases.length === 0 && !error && (
+                  <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-12 text-center">
+                    <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <ListChecks className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <p className="text-gray-400 font-medium mb-1">No {activeFilterLabel.toLowerCase()} found</p>
+                    <p className="text-gray-500 text-sm">
+                      Choose another status filter to see more assigned cases.
+                    </p>
+                  </div>
+                )}
+
                 {/* Cases Grid */}
-                {casesData?.cases && casesData.cases.length > 0 && (
+                {filteredCases.length > 0 && (
                   <div className="space-y-4">
-                    {casesData.cases.map((caseItem, index) => (
+                    {filteredCases.map((caseItem, index) => (
                       <CaseRow
                         key={caseItem.id}
                         caseItem={caseItem}
@@ -526,6 +621,43 @@ function DoctorCases() {
           </div>
         </div>
       </div>
+
+      <Dialog open={isTutorialOpen} onOpenChange={setIsTutorialOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Stage 1: Clinical Diagnosis Tutorial</DialogTitle>
+          </DialogHeader>
+
+          <div className="w-full bg-slate-900/50 rounded-lg p-12 flex flex-col items-center justify-center min-h-96 border-2 border-dashed border-slate-700">
+            <Play className="w-16 h-16 text-blue-400 mb-4 opacity-50" />
+            <p className="text-gray-400 text-center text-lg mb-2">Tutorial Video Placeholder</p>
+            <p className="text-gray-500 text-sm text-center">
+              Tutorial content will be displayed here.<br />
+              This will be replaced with a video file or GIF from Supabase storage.
+            </p>
+          </div>
+
+          <div className="mt-6 text-sm text-gray-400 bg-slate-800/50 rounded p-4">
+            <p className="font-semibold text-white mb-2">Tutorial Topics:</p>
+            <ul className="list-disc list-inside space-y-1 text-xs">
+              <li>How to navigate X-ray images</li>
+              <li>Identifying clinical findings</li>
+              <li>Writing effective clinical reports</li>
+              <li>Submitting your evaluation</li>
+            </ul>
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setIsTutorialOpen(false)}
+              className="flex-1"
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
