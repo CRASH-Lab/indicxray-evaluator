@@ -28,7 +28,7 @@ function SupervisorLogin() {
         localStorage.setItem('userRole', response.user.role);
         
         if (response.user.role === 'supervisor') {
-          navigate(`/supervisor/dashboard/${response.user.id}`)
+          navigate(`/supervisor/dashboard/${response.user.id}?tab=evaluators`)
         } else {
           setError('Access denied: Supervisors only')
         }

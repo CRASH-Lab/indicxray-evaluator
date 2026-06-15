@@ -47,7 +47,7 @@ function RadId() {
           localStorage.setItem('userRole', response.user.role || 'evaluator');
           
           if (response.user.role === 'supervisor') {
-               navigate(`/supervisor/dashboard/${response.user.id}`);
+               navigate(`/supervisor/dashboard/${response.user.id}?tab=evaluators`);
           } else {
                // Navigate to stage selection screen instead of direct dashboard
                navigate(`/select-stage/${response.user.id}`);

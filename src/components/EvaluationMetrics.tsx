@@ -234,8 +234,8 @@ export const EvaluationMetrics: React.FC<EvaluationMetricsProps> = ({
                     key={model.responseId}
                     className="border-b border-medical-dark-gray/20"
                   >
-                    <td className="p-3 font-medium text-left">
-                      {modelResponse.model_name}
+                    <td className="p-3 font-medium text-left text-white">
+                      Model {modelResponses.findIndex(m => m.id === modelResponse.id) + 1}
                     </td>
 
                     {metrics.map((metric) => {
@@ -259,8 +259,8 @@ export const EvaluationMetrics: React.FC<EvaluationMetricsProps> = ({
                               updateEvaluation(model.responseId, metric.id, newValue);
                             }}
                             className={cn(
-                              "w-20 h-8 rounded text-center",
-                              getScoreColor(score),
+                              "w-20 h-8 rounded text-center font-bold text-sm",
+                              score !== null && score !== undefined ? getScoreColor(score) : "bg-slate-700 text-white",
                               "border border-medical-dark-gray/30",
                               "focus:outline-none focus:ring-2 focus:ring-medical-blue",
                               "disabled:opacity-50"

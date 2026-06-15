@@ -40,7 +40,7 @@ function LoginRouteGuard({ children }: { children: JSX.Element }) {
   }
 
   if (userRole === 'supervisor') {
-    return <Navigate to={`/supervisor/dashboard/${userId}`} replace />
+    return <Navigate to={`/supervisor/dashboard/${userId}?tab=evaluators`} replace />
   }
 
   return <Navigate to={`/select-stage/${userId}`} replace />

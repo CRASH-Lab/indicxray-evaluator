@@ -420,7 +420,21 @@ async function getAllCases() {
 async function getAllEvaluators() {
   try {
     const response = await instance.get("admin/users/");
-    return response.data;
+    const data = response.data;
+
+    // Normalize common API shapes to an array of evaluators
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.results)) return data.results;
+    if (Array.isArray(data.users)) return data.users;
+    if (Array.isArray(data.data)) return data.data;
+
+    // If the API returns a single object mapping ids to user objects, extract values
+    if (data && typeof data === 'object') {
+      const values = Object.values(data).filter(v => v && typeof v === 'object' && v.id)
+      if (values.length > 0) return values as any[]
+    }
+
+    return [];
   } catch (error) {
     console.error("Error fetching evaluators:", error);
     return [];
@@ -553,15 +567,37 @@ async function adminGetAllEvaluatorEvaluations(evaluatorId: string) {
       metric_id: string;
       metric_name: string;
       evaluator_id: string;
+      evaluator_name?: string;
+      evaluator_group?: string;
       case_id: string;
       is_cross_assigned: boolean;
       model_id: string;
       model_name: string;
+      peer_evaluator_id?: string | null;
+      peer_evaluator_name?: string | null;
+      peer_evaluator_group?: string | null;
+      peer_score?: number | null;
+      agreement_status?: 'concordant' | 'divergent' | 'pending' | 'unpaired';
       created_at: string;
     }>;
   } catch (error) {
     console.error("Error fetching all evaluations for evaluator:", error);
     return [];
+  }
+}
+
+async function adminGetEvaluatorInterraterSummary(
+  evaluatorId: string,
+  assignmentType: 'all' | 'original' | 'cross' = 'all',
+) {
+  try {
+    const response = await instance.get(`admin/evaluator/${evaluatorId}/interrater-summary/`, {
+      params: { assignment_type: assignmentType },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching evaluator interrater summary:", error);
+    return null;
   }
 }
 
@@ -650,6 +686,7 @@ export {
   adminGetAssignments,
   adminGetEvaluations,
   adminGetAllEvaluatorEvaluations,
+  adminGetEvaluatorInterraterSummary,
   getStage2Images,
   saveStage2Evaluation,
   adminGetStage2Stats,

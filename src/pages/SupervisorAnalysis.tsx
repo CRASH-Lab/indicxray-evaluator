@@ -1,10 +1,29 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { Download, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { adminRunReliabilityReport } from '@/services'
+import {
+  downloadCsv,
+  downloadWorkbook,
+  filterSheetsByColumns,
+  flattenSheetsForCsv,
+  getCsvColumns,
+  makeReportFilename,
+  reliabilityReportSheets,
+} from '@/lib/reportExports'
 
 type ReliabilityStats = {
   n: number
@@ -45,11 +64,38 @@ const formatStat = (value: number | null, digits = 4) => {
   return value.toFixed(digits)
 }
 
+const getAnalysisErrorMessage = (err: unknown) => {
+  const responseData = (err as { response?: { data?: unknown } })?.response?.data
+
+  if (typeof responseData === 'string' && responseData.trim()) {
+    return responseData
+  }
+
+  if (responseData && typeof responseData === 'object') {
+    const data = responseData as { detail?: unknown; error?: unknown; message?: unknown }
+    const message = data.detail || data.error || data.message
+    if (typeof message === 'string' && message.trim()) {
+      return message
+    }
+  }
+
+  if (err instanceof Error && err.message) {
+    return err.message
+  }
+
+  return 'Failed to run reliability analysis. Please try again.'
+}
+
 function SupervisorAnalysis() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [report, setReport] = useState<ReliabilityResponse | null>(null)
+  const [analysisExportColumns, setAnalysisExportColumns] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    setAnalysisExportColumns(null)
+  }, [report])
 
   const runAnalysis = async () => {
     setLoading(true)
@@ -59,24 +105,131 @@ function SupervisorAnalysis() {
       setReport(data as ReliabilityResponse)
     } catch (err) {
       console.error('Failed to run reliability analysis:', err)
-      setError('Failed to run reliability analysis. Please try again.')
+      setError(getAnalysisErrorMessage(err))
     } finally {
       setLoading(false)
     }
   }
 
+  const handleSaveCsv = () => {
+    if (!report) return
+    const sheets = reliabilityReportSheets(report, MODEL_NAME_MAP)
+    const columns = analysisExportColumns ?? getCsvColumns(sheets)
+    downloadCsv(makeReportFilename(['analysis-report'], 'csv'), flattenSheetsForCsv(sheets, columns))
+  }
+
+  const handleSaveExcel = () => {
+    if (!report) return
+    const sheets = reliabilityReportSheets(report, MODEL_NAME_MAP)
+    const columns = analysisExportColumns ?? getCsvColumns(sheets)
+    downloadWorkbook(makeReportFilename(['analysis-report'], 'xlsx'), filterSheetsByColumns(sheets, columns))
+  }
+
+  const renderAnalysisExportMenu = (format: 'csv' | 'excel') => {
+    if (!report) return null
+
+    const sheets = reliabilityReportSheets(report, MODEL_NAME_MAP)
+    const columns = getCsvColumns(sheets)
+    const activeColumns = analysisExportColumns ?? columns
+    const activeColumnSet = new Set(activeColumns)
+    const isCsv = format === 'csv'
+
+    const toggleColumn = (column: string, checked: boolean) => {
+      const nextColumns = checked
+        ? Array.from(new Set([...activeColumns, column]))
+        : activeColumns.filter((item) => item !== column)
+      setAnalysisExportColumns(nextColumns.length === columns.length ? null : nextColumns)
+    }
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Save {isCsv ? 'CSV' : 'Excel'}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="max-h-96 w-72 overflow-y-auto">
+          <DropdownMenuLabel>Columns to export</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={activeColumns.length === 0}
+            onClick={isCsv ? handleSaveCsv : handleSaveExcel}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download {isCsv ? 'CSV' : 'Excel'} ({activeColumns.length}/{columns.length})
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setAnalysisExportColumns(null)}>
+            Select all
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setAnalysisExportColumns([])}>
+            Clear all
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {columns.map((column) => (
+            <DropdownMenuCheckboxItem
+              key={column}
+              checked={activeColumnSet.has(column)}
+              onCheckedChange={(checked) => toggleColumn(column, Boolean(checked))}
+              onSelect={(event) => event.preventDefault()}
+            >
+              {column}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  const hasReport = Boolean(report)
+
   return (
-    <div className="container mx-auto py-8">
-      <Card className="mb-6">
+    <div
+      className={`container mx-auto py-8 transition-all duration-500 ${
+        hasReport ? '' : 'flex min-h-[calc(100vh-4rem)] flex-col justify-center'
+      }`}
+    >
+      <Card
+        className={`transition-all duration-500 ${
+          hasReport
+            ? 'mb-6'
+            : 'mx-auto w-full max-w-3xl border-primary/20 bg-card/95 shadow-2xl shadow-primary/10'
+        }`}
+      >
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Supervisor Analysis</CardTitle>
-              <CardDescription>
+          <div
+            className={`flex gap-6 ${
+              hasReport
+                ? 'items-center justify-between'
+                : 'flex-col items-center text-center'
+            }`}
+          >
+            <div className={hasReport ? '' : 'max-w-2xl'}>
+              <div
+                className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                  loading
+                    ? 'border-primary/40 bg-primary/15 text-primary'
+                    : hasReport
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                      : 'border-slate-700 bg-slate-900/80 text-slate-300'
+                }`}
+              >
+                {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {loading ? 'Running analysis' : hasReport ? 'Latest analysis ready' : 'Ready to run'}
+              </div>
+              <CardTitle className={hasReport ? '' : 'text-3xl'}>Supervisor Analysis</CardTitle>
+              <CardDescription className={hasReport ? '' : 'mt-3 text-base'}>
                 Run inter-rater, PABAK, and Gwet AC1 reports for cross-assigned Stage 1 evaluations.
               </CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className={`flex flex-wrap gap-2 ${hasReport ? 'justify-end' : 'justify-center'}`}>
+              {report && (
+                <>
+                  {renderAnalysisExportMenu('csv')}
+                  {renderAnalysisExportMenu('excel')}
+                </>
+              )}
               <Button onClick={runAnalysis} disabled={loading}>
                 {loading ? (
                   <>
@@ -92,15 +245,35 @@ function SupervisorAnalysis() {
               </Button>
             </div>
           </div>
+          {!hasReport && (
+            <div className="mt-8 grid gap-3 border-t border-border/60 pt-6 text-left sm:grid-cols-3">
+              <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">Source</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">Cross-assigned Stage 1</p>
+              </div>
+              <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">Includes</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">Agreement and reliability</p>
+              </div>
+              <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">Exports</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">CSV and Excel after run</p>
+              </div>
+            </div>
+          )}
         </CardHeader>
       </Card>
 
       {error && (
-        <Card className="mb-6 border-red-500">
-          <CardContent className="pt-6">
-            <p className="text-red-500">{error}</p>
-          </CardContent>
-        </Card>
+        <Alert
+          variant="destructive"
+          className={`mb-6 border-red-500/60 bg-red-500/10 text-red-100 ${
+            hasReport ? '' : 'mx-auto w-full max-w-3xl'
+          }`}
+        >
+          <AlertTitle>Analysis could not run</AlertTitle>
+          <AlertDescription className="text-red-100/90">{error}</AlertDescription>
+        </Alert>
       )}
 
       {report && (

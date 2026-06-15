@@ -1,7 +1,7 @@
 import React, { useState, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { ModelOutput, Metric } from '@/types'
-import { X } from 'lucide-react'
+import { X, BookOpen } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { getImageWithFallback } from '@/lib/imageUtils'
 import { refreshImageUrl } from '@/services'
@@ -44,71 +44,71 @@ const METRIC_GUIDELINES: Record<string, { 1: ReactNode; 0: ReactNode }> = {
 
 const METRIC_INSTRUCTIONS: Record<string, ReactNode> = {
   [METRIC_KEY('Anatomical Validity')]: (
-    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
-      <p className="text-foreground font-semibold">1) Anatomical Validity</p>
-      <p>Evaluate ONLY the generated image (ignore reference image and pathology region).</p>
-      <p className="text-foreground/90">Look for:</p>
+    <div className="space-y-2 text-xs text-white leading-relaxed">
+      <p className="text-white font-semibold">1) Anatomical Validity</p>
+      <p className="text-white">Evaluate ONLY the generated image (ignore reference image and pathology region).</p>
+      <p className="text-white font-medium">Look for:</p>
       <ul className="list-disc pl-5 space-y-1">
-        <li>Normal lung fields, ribs, clavicles, scapulae</li>
-        <li>Normal cardiomediastinal silhouette, shape and position</li>
-        <li>Normal diaphragm contours and bowel shadows</li>
+        <li className="text-white">Normal lung fields, ribs, clavicles, scapulae</li>
+        <li className="text-white">Normal cardiomediastinal silhouette, shape and position</li>
+        <li className="text-white">Normal diaphragm contours and bowel shadows</li>
       </ul>
     </div>
   ),
   [METRIC_KEY('Pathology Presence')]: (
-    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
-      <p className="text-foreground font-semibold">2) Pathology Presence</p>
-      <p>
+    <div className="space-y-2 text-xs text-white leading-relaxed">
+      <p className="text-white font-semibold">2) Pathology Presence</p>
+      <p className="text-white">
         Evaluate only whether a pathology (finding) is present in the generated image. Do not assess whether the pathology (finding) is radiologically correct.
       </p>
-      <p>
+      <p className="text-white">
         Revisiting prompt structure: Right moderate pleural effusion = Right moderate (Attribute) + Pleural effusion (Finding).
       </p>
-      <p className="text-foreground/90">Focus ONLY on:</p>
+      <p className="text-white font-medium">Focus ONLY on:</p>
       <ul className="list-disc pl-5 space-y-1 mb-1">
-        <li>Presence of abnormality</li>
+        <li className="text-white">Presence of abnormality</li>
       </ul>
-      <p className="text-foreground/90">Ignore:</p>
+      <p className="text-white font-medium">Ignore:</p>
       <ul className="list-disc pl-5 space-y-1">
-        <li>Whether it is radiologically correct</li>
-        <li>Whether secondary signs are present</li>
-        <li>Whether the diagnosis is accurate</li>
+        <li className="text-white">Whether it is radiologically correct</li>
+        <li className="text-white">Whether secondary signs are present</li>
+        <li className="text-white">Whether the diagnosis is accurate</li>
       </ul>
     </div>
   ),
   [METRIC_KEY('Internal Consistency')]: (
-    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
-      <p className="text-foreground font-semibold">3) Internal Consistency</p>
-      <p>Evaluate whether the pathology (finding) is radiologically correct.</p>
-      <p className="text-foreground/90">Focus on:</p>
+    <div className="space-y-2 text-xs text-white leading-relaxed">
+      <p className="text-white font-semibold">3) Internal Consistency</p>
+      <p className="text-white">Evaluate whether the pathology (finding) is radiologically correct.</p>
+      <p className="text-white font-medium">Focus on:</p>
       <ul className="list-disc pl-5 space-y-1">
-        <li>Radiological patterns fit the prompted pathology (finding)</li>
-        <li>Presence or absence of expected secondary signs</li>
+        <li className="text-white">Radiological patterns fit the prompted pathology (finding)</li>
+        <li className="text-white">Presence or absence of expected secondary signs</li>
       </ul>
     </div>
   ),
   [METRIC_KEY('Attribute Concordance')]: (
-    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
-      <p className="text-foreground font-semibold">4) Attribute concordance</p>
-      <p>
+    <div className="space-y-2 text-xs text-white leading-relaxed">
+      <p className="text-white font-semibold">4) Attribute concordance</p>
+      <p className="text-white">
         Evaluate whether attribute, location, and side of the prompted pathology (finding) is accurate. Revisiting prompt structure: Right moderate pleural effusion = Right moderate (Attribute) + Pleural effusion (Finding).
       </p>
     </div>
   ),
   [METRIC_KEY('Similarity Index')]: (
-    <div className="space-y-2 text-xs text-medical-gray/90 leading-relaxed">
-      <p className="text-foreground font-semibold">5) Similarity index</p>
-      <p>
+    <div className="space-y-2 text-xs text-white leading-relaxed">
+      <p className="text-white font-semibold">5) Similarity index</p>
+      <p className="text-white">
         Evaluate only the background features (ignoring the generated pathology) of the generated image compared to the reference image.
       </p>
-      <p className="text-foreground/90">Carefully look for:</p>
+      <p className="text-white font-medium">Carefully look for:</p>
       <ul className="list-disc pl-5 space-y-1">
-        <li>Same radiographic marker</li>
-        <li>Same breast shadow</li>
-        <li>Same bowel or stomach gas</li>
-        <li>Presence of additional hallucinated artefacts</li>
-        <li>Increased or decreased graininess</li>
-        <li>Any signs that the background chest X-ray is not from the same patient</li>
+        <li className="text-white">Same radiographic marker</li>
+        <li className="text-white">Same breast shadow</li>
+        <li className="text-white">Same bowel or stomach gas</li>
+        <li className="text-white">Presence of additional hallucinated artefacts</li>
+        <li className="text-white">Increased or decreased graininess</li>
+        <li className="text-white">Any signs that the background chest X-ray is not from the same patient</li>
       </ul>
     </div>
   ),
@@ -284,8 +284,8 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
           <div className="w-2/3 bg-black border-r border-medical-dark-gray/30 flex relative flex-col">
             <div className="flex-1 flex overflow-hidden">
             {/* Ground Truth Image */}
-              <div className="flex-1 flex flex-col relative border-r border-medical-dark-gray/50">
-                <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-black/60 rounded text-sm font-medium text-white backdrop-blur-sm border border-white/10">
+              <div className="flex-1 flex flex-col relative border-r border-medical-dark-gray/50 bg-gradient-to-br from-blue-500/10 to-emerald-500/10">
+                <div className="absolute top-4 left-4 z-10 px-4 py-2 bg-emerald-500/30 rounded-lg text-sm font-bold text-emerald-100 backdrop-blur-sm border border-emerald-400/50">
                   Ground Truth
                 </div>
                 <div className="flex-1 flex items-center justify-center p-6">
@@ -356,8 +356,8 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
 
               {/* Evaluated Image */}
               <div className="flex-1 flex flex-col relative">
-                <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-medical-blue/80 rounded text-sm font-medium text-white backdrop-blur-sm border border-medical-blue">
-                  Model Output ({model.modelName})
+                <div className="absolute top-4 left-4 z-10 px-4 py-2 bg-blue-500/30 rounded-lg text-sm font-bold text-blue-100 backdrop-blur-sm border border-blue-400/50">
+                  {model.modelName}
                 </div>
                 <div className="flex-1 flex items-center justify-center p-6">
                   {currentUrl ? (
@@ -460,7 +460,7 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h4 className="text-base font-semibold text-foreground">{metric.name}</h4>
-                          <p className="text-xs text-medical-gray mt-1">{metric.description?.split('?')[0]}?</p>
+                          <p className="text-xs text-white mt-1">{metric.description?.split('?')[0]}?</p>
                         </div>
                         {instructions && (
                           <button
@@ -471,10 +471,8 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
                               )
                             }
                             className={cn(
-                              "shrink-0 px-3 py-1 text-xs font-medium rounded transition-colors",
-                              isInstructionsOpen
-                                ? "bg-medical-blue text-white hover:bg-medical-blue/80"
-                                : "bg-medical-dark-gray/50 text-medical-gray hover:bg-medical-dark-gray/80 hover:text-foreground"
+                              "shrink-0 px-3 py-2 text-xs font-bold rounded-lg transition-colors",
+                              "bg-blue-500/30 text-blue-100 border border-blue-400/50 hover:bg-blue-500/40"
                             )}
                           >
                             Instructions
@@ -505,7 +503,10 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
                               scores[metric.id] === 1 ? "bg-green-500 text-white" : "bg-medical-gray text-medical-darkest-gray"
                             )}>1</span>
                           </div>
-                          <p className="text-xs text-medical-gray/80 leading-relaxed">
+                          <p className={cn(
+                            "text-xs leading-relaxed",
+                            scores[metric.id] === 1 ? "text-green-300 font-medium" : "text-white"
+                          )}>
                             {guidelines[1]}
                           </p>
                         </button>
@@ -526,7 +527,10 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
                               scores[metric.id] === 0 ? "bg-red-500 text-white" : "bg-medical-gray text-medical-darkest-gray"
                             )}>0</span>
                           </div>
-                          <p className="text-xs text-medical-gray/80 leading-relaxed">
+                          <p className={cn(
+                            "text-xs leading-relaxed",
+                            scores[metric.id] === 0 ? "text-red-300 font-medium" : "text-white"
+                          )}>
                             {guidelines[0]}
                           </p>
                         </button>
@@ -540,7 +544,21 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-medical-dark-gray/30 p-6 bg-medical-darker-gray flex justify-end gap-3">
+        <div className="border-t border-medical-dark-gray/30 p-6 bg-medical-darker-gray flex justify-between items-center gap-3">
+          <a
+            href="/Syn_CXR_RISE_Evaluators_Guide.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg",
+              "bg-medical-dark-gray border border-medical-dark-gray/50 hover:border-medical-blue/50",
+              "text-sm font-medium text-white transition-all hover:bg-medical-blue/10"
+            )}
+          >
+            <BookOpen size={16} className="text-medical-blue shrink-0" />
+            Evaluator's Guide
+          </a>
+          <div className="flex gap-3">
           <button
             onClick={onClose}
             className="px-6 py-2 rounded-lg bg-medical-dark-gray text-foreground hover:bg-medical-dark-gray/80 transition-colors"
@@ -559,6 +577,7 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
           >
             {allScored ? 'Save Evaluation' : 'Score All Metrics'}
           </button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
