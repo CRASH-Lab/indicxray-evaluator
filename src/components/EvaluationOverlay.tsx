@@ -1,7 +1,7 @@
 import React, { useState, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { ModelOutput, Metric } from '@/types'
-import { X } from 'lucide-react'
+import { X, BookOpen } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { getImageWithFallback } from '@/lib/imageUtils'
 import { refreshImageUrl } from '@/services'
@@ -544,7 +544,21 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-medical-dark-gray/30 p-6 bg-medical-darker-gray flex justify-end gap-3">
+        <div className="border-t border-medical-dark-gray/30 p-6 bg-medical-darker-gray flex justify-between items-center gap-3">
+          <a
+            href="/Syn_CXR_RISE_Evaluators_Guide.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg",
+              "bg-medical-dark-gray border border-medical-dark-gray/50 hover:border-medical-blue/50",
+              "text-sm font-medium text-white transition-all hover:bg-medical-blue/10"
+            )}
+          >
+            <BookOpen size={16} className="text-medical-blue shrink-0" />
+            Evaluator's Guide
+          </a>
+          <div className="flex gap-3">
           <button
             onClick={onClose}
             className="px-6 py-2 rounded-lg bg-medical-dark-gray text-foreground hover:bg-medical-dark-gray/80 transition-colors"
@@ -563,6 +577,7 @@ export const EvaluationOverlay: React.FC<EvaluationOverlayProps> = ({
           >
             {allScored ? 'Save Evaluation' : 'Score All Metrics'}
           </button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

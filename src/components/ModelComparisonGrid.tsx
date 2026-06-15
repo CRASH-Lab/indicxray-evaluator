@@ -162,6 +162,7 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
           )
         })}
       </div>
+
     </div>
   )
 }
