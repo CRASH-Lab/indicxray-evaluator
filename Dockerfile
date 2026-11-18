@@ -1,29 +1,21 @@
-# Build Stage
-FROM node:18-alpine AS build
+# IndicXray evaluator — React app served by nginx, for Google Cloud Run.
+# The backend URL is NOT baked in: set the API_URL env var on the Cloud Run
+# service; docker/env-config.sh writes it into env-config.js at startup.
+#
+# Build:  docker build -t indicxray-evaluator .
+# Run:    docker run --rm -p 8080:8080 -e API_URL=http://localhost:8000 indicxray-evaluator
 
+FROM node:20-alpine AS build
 WORKDIR /app
-
-# Install dependencies (using package-lock.json for consistency)
 COPY package.json package-lock.json ./
 RUN npm ci
-
-# Copy source code
 COPY . .
-
-# Build the app
 RUN npm run build
 
-# Production Stage
 FROM nginx:alpine
-
-# Copy built assets from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
-
-# Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose port 8080 (Cloud Run default)
+# The nginx entrypoint runs every script in /docker-entrypoint.d before starting
+COPY docker/env-config.sh /docker-entrypoint.d/40-env-config.sh
 EXPOSE 8080
-
-# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]

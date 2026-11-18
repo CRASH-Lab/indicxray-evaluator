@@ -1,0 +1,11 @@
+# Keep local env files out of the image: config comes from Cloud Run env vars
+.env
+.env.*
+node_modules
+dist
+.venv
+.git
+.github
+.DS_Store
+*.log
+lint_output.txt

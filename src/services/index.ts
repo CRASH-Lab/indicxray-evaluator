@@ -7,7 +7,12 @@ import {
   transformAssignedImagesToRecords,
 } from "./adapters";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "";
+// Backend URL: set at container start from the API_URL env var (public/env-config.js),
+// falling back to VITE_API_URL from .env for local development.
+const BASE_URL =
+  (window as { __ENV__?: { API_URL?: string } }).__ENV__?.API_URL ||
+  import.meta.env.VITE_API_URL ||
+  "";
 
 // Get token from localStorage
 const getAuthToken = () => localStorage.getItem("authToken");
