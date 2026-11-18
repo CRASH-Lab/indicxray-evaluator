@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { getImageWithFallback } from '@/lib/imageUtils'
 import { refreshImageUrl } from '@/services'
+import { Loader2 } from 'lucide-react'
 
 interface GroundTruthPanelProps {
   imageId?: string
@@ -19,10 +20,12 @@ export const GroundTruthPanel: React.FC<GroundTruthPanelProps> = ({
 }) => {
   const [currentUrl, setCurrentUrl] = useState(imageUrl)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
     setCurrentUrl(imageUrl)
     setIsRefreshing(false)
+    setIsLoaded(false)
   }, [imageUrl])
 
   const handleImageError = async () => {
@@ -55,10 +58,17 @@ export const GroundTruthPanel: React.FC<GroundTruthPanelProps> = ({
 
       {/* X-Ray Image */}
       <div className="flex-shrink-0 bg-black border-b border-medical-dark-gray/30">
-        <div className="relative">
+        <div className="relative min-h-[200px]">
+          {(!isLoaded || isRefreshing) && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-medical-darker-gray/80" role="status" aria-live="polite">
+              <Loader2 size={32} className="animate-spin text-medical-blue/70 mb-2" />
+              <p className="text-xs text-medical-gray">{isRefreshing ? 'Refreshing image link…' : 'Fetching image…'}</p>
+            </div>
+          )}
           <img
             src={currentUrl}
             alt="Ground Truth X-Ray"
+            onLoad={() => setIsLoaded(true)}
             onError={handleImageError}
             className={cn(
               "w-full h-auto object-contain transition-opacity duration-300",

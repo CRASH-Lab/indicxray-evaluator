@@ -16,6 +16,7 @@ import {
   User,
   LogOut,
   Play,
+  Loader2,
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { saveCaseNavigationManifest } from '@/hooks/use-case-navigation'
@@ -455,6 +456,9 @@ function DoctorCases() {
 
         {/* Main Content Skeleton */}
         <div className="flex-1 p-8">
+          <p className="flex items-center gap-2 text-sm text-slate-400 mb-4" role="status" aria-live="polite">
+            <Loader2 className="w-4 h-4 animate-spin" /> Fetching your cases and images…
+          </p>
           <Skeleton className="h-12 w-48 mb-8" />
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             {[1, 2, 3, 4].map((i) => (

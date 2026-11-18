@@ -114,7 +114,9 @@ export const ModelComparisonGrid: React.FC<ModelComparisonGridProps> = ({
                {(!loadedImages[model.id] || refreshingIds.has(model.id)) && (
                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-medical-darker-gray z-0">
                     <Loader2 size={32} className="animate-spin text-medical-blue/70 mb-2" />
-                    <p className="text-xs text-medical-gray">Loading Preview...</p>
+                    <p className="text-xs text-medical-gray">
+                      {refreshingIds.has(model.id) ? 'Refreshing image link…' : 'Fetching image…'}
+                    </p>
                  </div>
                )}
                

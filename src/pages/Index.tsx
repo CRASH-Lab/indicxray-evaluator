@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { transformRecordsToCase } from '@/services/adapters'
-import { Settings } from 'lucide-react'
+import { Settings, Loader2 } from 'lucide-react'
 import { GroundTruthPanel } from '@/components/ImageNavigationSidebar'
 import { ModelComparisonGrid } from '@/components/ModelComparisonGrid'
 import { EvaluationOverlay } from '@/components/EvaluationOverlay'
@@ -91,8 +91,12 @@ const Index = (props: Props) => {
   if (!caseRecord) {
      // ... (loading is same)
      return (
-       <div className="min-h-screen flex items-center justify-center bg-medical-darkest-gray text-foreground">
-         <p>Loading case...</p>
+       <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-medical-darkest-gray text-foreground" role="status" aria-live="polite">
+         <Loader2 size={36} className="animate-spin text-medical-blue" />
+         <p className="text-base font-medium">Fetching images…</p>
+         <p className="text-sm text-medical-gray max-w-sm text-center">
+           Preparing secure links to this case's X-rays. This can take a few seconds.
+         </p>
        </div>
      )
   }
